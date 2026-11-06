@@ -60,7 +60,14 @@ public final class UiSmoke {
         SwingUtilities.invokeAndWait(() -> {
             for(Component c:view.getComponents())if(c instanceof JTabbedPane tabs)tabs.setSelectedIndex(2);
         });
+        boolean clientsLoaded=false;
+        for(int n=0;n<100;n++) {
+            AtomicReference<Boolean> ready=new AtomicReference<>(false);
+            SwingUtilities.invokeAndWait(() -> ready.set(((JTable)find(view,"clientes")).getRowCount()>0));
+            if(ready.get()){clientsLoaded=true;break;}Thread.sleep(100);
+        }
+        if(!clientsLoaded)throw new AssertionError("La pestaña Clientes no cargó los registros activos");
         capture(view,output.resolve("03-clientes.png"));
-        System.out.println("PASS Swing: conexión por botón, carga de 500 filas y renderizado de tres pantallas");
+        System.out.println("PASS Swing: conexión por botón, carga de 500 comprobantes y clientes activos, renderizado de tres pantallas");
     }
 }

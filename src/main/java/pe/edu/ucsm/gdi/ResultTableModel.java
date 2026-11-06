@@ -21,7 +21,23 @@ public final class ResultTableModel extends AbstractTableModel {
     }
     @Override public int getRowCount(){return data.rows().size();}
     @Override public int getColumnCount(){return data.columns().size();}
-    @Override public String getColumnName(int column){return data.columns().get(column);}
+    @Override public String getColumnName(int column){
+        String name=data.columns().get(column);
+        return switch(name){
+            case "numero" -> "Número";
+            case "fecha_emision" -> "Fecha de emisión";
+            case "tipo_comprobante" -> "Tipo de comprobante";
+            case "codigo_moneda" -> "Moneda";
+            case "importe_total" -> "Importe total";
+            case "tipo_documento" -> "Tipo de documento";
+            case "numero_documento" -> "Documento";
+            case "nombre_razon_social" -> "Nombre / razón social";
+            case "direccion" -> "Dirección";
+            case "descripcion" -> "Descripción";
+            case "codigo" -> "Código";
+            default -> Character.toUpperCase(name.charAt(0))+name.substring(1).replace('_',' ');
+        };
+    }
     @Override public Object getValueAt(int row,int column){return data.rows().get(row).get(column);}
     @Override public Class<?> getColumnClass(int column){return types[column];}
     @Override public boolean isCellEditable(int row,int column){return false;}

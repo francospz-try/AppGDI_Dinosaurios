@@ -69,12 +69,16 @@ public final class GdiWindow extends JPanel {
         status.setBorder(BorderFactory.createEmptyBorder(8,0,0,0)); add(status,BorderLayout.SOUTH);
         status.setName("estado"); connect.setName("conectar");
         receiptSearch.setName("buscarComprobante"); receipts.setName("comprobantes");
+        customers.setName("clientes");
         try {
             DbConfig c=DbConfig.load(configPath);
             host.setText(c.host());port.setText(Integer.toString(c.port()));dbName.setText(c.name());
             user.setText(c.user());password.setText(c.password());
         } catch (Exception e) { status.setText("Configure la conexión aquí o copie config/database.properties.example."); }
         setButtons(false);
+        tabs.addChangeListener(e -> {
+            if(tabs.getSelectedIndex()==2 && repository!=null && connect.isEnabled())loadCustomers();
+        });
     }
 
     private JPanel connectionPanel() {
@@ -236,6 +240,20 @@ public final class GdiWindow extends JPanel {
         t.setDefaultRenderer(java.sql.Date.class,new javax.swing.table.DefaultTableCellRenderer(){
             private static final long serialVersionUID=1L;
             @Override protected void setValue(Object value){setText(value==null?"":value.toString());}
+        });
+        javax.swing.table.DefaultTableCellRenderer decimal=new javax.swing.table.DefaultTableCellRenderer(){
+            private static final long serialVersionUID=1L;
+            @Override protected void setValue(Object value){
+                super.setValue(value instanceof java.math.BigDecimal number?number.toPlainString():value);
+            }
+        };
+        decimal.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
+        t.setDefaultRenderer(java.math.BigDecimal.class,decimal);
+        t.setDefaultRenderer(Object.class,new javax.swing.table.DefaultTableCellRenderer(){
+            private static final long serialVersionUID=1L;
+            @Override protected void setValue(Object value){
+                super.setValue(value instanceof java.math.BigDecimal number?number.toPlainString():value);
+            }
         });return t;
     }
     private static void fill(JTable table,TableData data) {
