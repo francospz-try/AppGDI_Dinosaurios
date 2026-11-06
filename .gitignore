@@ -1,0 +1,7 @@
+build/
+lib/
+config/database.properties
+*.log
+.idea/
+.vscode/
+.DS_Store

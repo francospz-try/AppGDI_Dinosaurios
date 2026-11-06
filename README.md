@@ -12,8 +12,6 @@ Java 21, Swing, JDBC directo y PostgreSQL. Sin ORM ni frameworks de aplicación.
 - Doce reportes mediante procedimientos; siete contienen JOIN.
 - Operaciones JDBC fuera del hilo de eventos de la interfaz.
 
-![Consulta de comprobantes con datos de prueba](docs/evidencia/comprobantes.png)
-
 **Pendiente para el 70 %:** alta/edición/baja de comprobantes y sus líneas y
 referencias, mantenimiento de los demás catálogos, integridad al eliminar la última
 línea y pruebas de esos flujos. Los doce reportes conservan los ejemplos y periodos

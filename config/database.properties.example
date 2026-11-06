@@ -1,0 +1,6 @@
+# Copiar como config/database.properties. No publicar credenciales reales.
+db.host=127.0.0.1
+db.port=5432
+db.name=registro_comprobantes
+db.user=gdi_app
+db.password=
