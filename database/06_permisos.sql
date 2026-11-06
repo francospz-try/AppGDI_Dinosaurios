@@ -13,7 +13,10 @@ GRANT USAGE ON SCHEMA public, app TO gdi_app;
 GRANT SELECT ON public.cliente,public.comprobante,public.serie_comprobante,
   public.moneda,public.producto_servicio,public.incluye,public.referencia,
   public.documento_relacionado TO gdi_app;
-GRANT INSERT,UPDATE ON public.cliente TO gdi_app;
+GRANT INSERT,UPDATE ON public.cliente,public.comprobante,public.serie_comprobante,
+ public.moneda,public.producto_servicio,public.incluye,public.referencia,public.documento_relacionado TO gdi_app;
+GRANT DELETE ON public.incluye,public.referencia TO gdi_app;
+GRANT SELECT ON app.v_comprobante,app.v_incluye,app.v_referencia TO gdi_app;
 REVOKE ALL ON ALL PROCEDURES IN SCHEMA app FROM PUBLIC;
 GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA app TO gdi_app;
 COMMIT;

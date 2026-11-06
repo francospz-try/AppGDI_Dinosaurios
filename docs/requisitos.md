@@ -30,8 +30,8 @@ por el canal oficial; no se generan firmas ni se publican en GitHub.
 | Hito | Alcance | Estado de este primer incremento |
 |---|---|---|
 | 30 % | Conexión real, navegación, lectura y detalle | Implementado y probado en Linux; falta demostrar en Windows |
-| 70 % | CRUD completo de catálogos y comprobantes, procedimientos y pruebas | Pendiente |
+| 70 % | CRUD completo de catálogos y comprobantes, procedimientos y pruebas | Implementado y ejecutado en Linux; falta comprobar Windows local |
 | 100 % | Funcionalidad completa, instalación portable y documentación final | Pendiente |
 
-El CRUD de clientes y los 12 reportes adelantan parte del segundo hito. No equivalen
-al 70 % mientras falten el registro/edición/baja de comprobantes y los otros catálogos.
+El incremento del 70 % incluye cabecera, detalle, referencias y los cinco catálogos.
+La documentación final y el empaquetado del 100 % quedan fuera por indicación del equipo.

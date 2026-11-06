@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -35,13 +36,16 @@ public final class GdiWindow extends JPanel {
     private final JPasswordField password=new JPasswordField();
     private final JLabel status=new JLabel("Sin conexión. Configure PostgreSQL para comenzar.");
     private final JLabel counter=new JLabel("Busque por serie-número, cliente o documento. Máximo 500 resultados.");
-    private final JTable receipts=table(), customers=table(), reports=table();
+    private final JTable receipts=table(), customers=table(), reports=table(),catalog=table();
+    private final JCheckBox includeInactive=new JCheckBox("Incluir bajas"),catalogInactive=new JCheckBox("Incluir bajas");
+    private final JComboBox<CatalogEditor.Kind> catalogKind=new JComboBox<>(CatalogEditor.Kind.values());
+    private final JTextField catalogSearch=new JTextField(16);
     private final JTextField receiptSearch=new JTextField(24), customerSearch=new JTextField(22);
     private final JTabbedPane tabs=new JTabbedPane();
     private final List<JButton> dbButtons=new ArrayList<>();
     private final JButton connect=new JButton("Probar y conectar");
     private GdiRepository repository;
-    private TableData receiptData, customerData;
+    private TableData receiptData, customerData,catalogData;
 
     private static final String[] REPORTS={
         "01 · Comprobantes del 25 al 27 de agosto de 2026", "02 · Detalle de F001-005206",
@@ -59,17 +63,19 @@ public final class GdiWindow extends JPanel {
         JLabel title=new JLabel("GDI  /  Registro de comprobantes");
         title.setFont(new Font(Font.SANS_SERIF,Font.BOLD,26)); title.setForeground(GREEN);
         heading.add(title,BorderLayout.NORTH);
-        heading.add(new JLabel("Boletas y facturas emitidas · Cliente PostgreSQL · Primer incremento"),BorderLayout.SOUTH);
+        heading.add(new JLabel("Boletas y facturas emitidas · Cliente PostgreSQL · Avance al 70 %"),BorderLayout.SOUTH);
         add(heading,BorderLayout.NORTH);
         tabs.addTab("Conexión",connectionPanel());
         tabs.addTab("Comprobantes",receiptsPanel());
         tabs.addTab("Clientes",customersPanel());
+        tabs.addTab("Catálogos",catalogPanel());
         tabs.addTab("Reportes",reportsPanel());
         add(tabs,BorderLayout.CENTER);
         status.setBorder(BorderFactory.createEmptyBorder(8,0,0,0)); add(status,BorderLayout.SOUTH);
         status.setName("estado"); connect.setName("conectar");
         receiptSearch.setName("buscarComprobante"); receipts.setName("comprobantes");
         customers.setName("clientes");
+        catalog.setName("catalogos");
         try {
             DbConfig c=DbConfig.load(configPath);
             host.setText(c.host());port.setText(Integer.toString(c.port()));dbName.setText(c.name());
@@ -78,6 +84,7 @@ public final class GdiWindow extends JPanel {
         setButtons(false);
         tabs.addChangeListener(e -> {
             if(tabs.getSelectedIndex()==2 && repository!=null && connect.isEnabled())loadCustomers();
+            if(tabs.getSelectedIndex()==3 && repository!=null && connect.isEnabled())loadCatalog();
         });
     }
 
@@ -91,7 +98,7 @@ public final class GdiWindow extends JPanel {
         left.setPreferredSize(new Dimension(520,340));body.add(left,BorderLayout.WEST);
         JTextArea help=new JTextArea("ANTES DE CONECTAR\n\n"
             +"1. Inicie PostgreSQL.\n\n2. Prepare la base con los scripts originales.\n\n"
-            +"3. Aplique 04_aplicativo.sql, 05_reportes.sql y 06_permisos.sql.\n\n"
+            +"3. Aplique 04, 07, 05 y por último 06, según el README.\n\n"
             +"4. Asigne una contraseña al rol gdi_app siguiendo el README.\n\n"
             +"5. Introduzca las credenciales y pruebe la conexión.\n\n"
             +"El aplicativo no crea ni reinicia la base al abrirse.\n"
@@ -118,6 +125,9 @@ public final class GdiWindow extends JPanel {
         JPanel body=panel(); JPanel toolbar=new JPanel();
         JButton search=dbButton("Buscar",this::loadReceipts);search.setName("buscar");
         toolbar.add(receiptSearch);toolbar.add(search);toolbar.add(dbButton("Ver comprobante",this::openReceipt));
+        JButton create=dbButton("Nuevo",()->editReceipt(true));create.setName("nuevoComprobante");toolbar.add(create);
+        toolbar.add(dbButton("Modificar",()->editReceipt(false)));toolbar.add(dbButton("Dar de baja",this::deleteReceipt));toolbar.add(includeInactive);
+        includeInactive.addActionListener(e->{if(repository!=null&&connect.isEnabled())loadReceipts();});
         receiptSearch.addActionListener(e -> { if(repository!=null && connect.isEnabled()) loadReceipts(); });
         JPanel top=new JPanel(new BorderLayout());top.add(toolbar,BorderLayout.NORTH);top.add(counter,BorderLayout.SOUTH);
         body.add(top,BorderLayout.NORTH);body.add(scroll(receipts),BorderLayout.CENTER);
@@ -148,10 +158,64 @@ public final class GdiWindow extends JPanel {
 
     private void loadReceipts() {
         String query=receiptSearch.getText().strip();
-        work(() -> repository.comprobantes(query), data -> {
+        boolean include=includeInactive.isSelected();
+        work(() -> repository.comprobantes(query,include), data -> {
             receiptData=data;fill(receipts,data);
             counter.setText(data.rows().size() + " resultados · Máximo 500 por búsqueda · Seleccione una fila para ver el detalle.");
             status.setText("Consulta completada. Registro de comprobantes ya emitidos.");
+        });
+    }
+    private JPanel catalogPanel(){
+        JPanel body=panel(),toolbar=new JPanel();toolbar.add(catalogKind);toolbar.add(catalogSearch);
+        toolbar.add(dbButton("Buscar",this::loadCatalog));toolbar.add(dbButton("Nuevo",()->editCatalog(false)));
+        toolbar.add(dbButton("Modificar",()->editCatalog(true)));toolbar.add(dbButton("Dar de baja",this::deleteCatalog));toolbar.add(catalogInactive);
+        body.add(toolbar,BorderLayout.NORTH);body.add(scroll(catalog),BorderLayout.CENTER);
+        body.add(new JLabel("La baja impide nuevos usos y conserva las asociaciones históricas."),BorderLayout.SOUTH);
+        catalogKind.addActionListener(e->{if(repository!=null&&connect.isEnabled())loadCatalog();});
+        catalogInactive.addActionListener(e->{if(repository!=null&&connect.isEnabled())loadCatalog();});return body;
+    }
+    private void loadCatalog(){
+        CatalogEditor.Kind kind=(CatalogEditor.Kind)catalogKind.getSelectedItem();String query=catalogSearch.getText().strip();boolean include=catalogInactive.isSelected();
+        work(()->repository.catalogo(kind.table,query,include),data->{catalogData=data;fill(catalog,data);status.setText(data.rows().size()+" registros · Máximo 500 por búsqueda.");});
+    }
+    private void editCatalog(boolean editing){
+        int row=editing?selected(catalog):-1;if(editing&&row<0)return;
+        java.util.Map<String,Object> original=editing?ReceiptEditor.row(catalogData,row):null;
+        if(editing&&!Boolean.TRUE.equals(original.get("activo"))){status.setText("El registro tiene baja lógica.");return;}
+        CatalogEditor.Kind kind=(CatalogEditor.Kind)catalogKind.getSelectedItem();CatalogEditor editor=new CatalogEditor(kind,original);
+        showCatalogEditor(editor,kind,editing);
+    }
+    private void showCatalogEditor(CatalogEditor editor,CatalogEditor.Kind kind,boolean editing){
+        while(JOptionPane.showConfirmDialog(this,editor,(editing?"Modificar · ":"Nuevo · ")+kind.label,JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION){
+            try{var values=editor.values();work(()->{repository.guardarCatalogo(kind.table,editing?"modificar":"crear",values);return true;},ignored->loadCatalog(),error->showCatalogEditor(editor,kind,editing));return;}
+            catch(IllegalArgumentException e){showError(e);}
+        }
+    }
+    private void deleteCatalog(){
+        int row=selected(catalog);if(row<0)return;var values=ReceiptEditor.row(catalogData,row);
+        if(!Boolean.TRUE.equals(values.get("activo"))){status.setText("El registro ya tiene baja lógica.");return;}
+        CatalogEditor.Kind kind=(CatalogEditor.Kind)catalogKind.getSelectedItem();
+        if(JOptionPane.showConfirmDialog(this,"¿Dar de baja al registro seleccionado? Se conservará su historial.","Baja lógica",JOptionPane.YES_NO_OPTION)!=JOptionPane.YES_OPTION)return;
+        work(()->{repository.guardarCatalogo(kind.table,"baja",values);return true;},ignored->loadCatalog());
+    }
+    private void editReceipt(boolean creating){
+        int row=creating?-1:selected(receipts);if(!creating&&row<0)return;
+        String serie=creating?"":receiptData.value(row,"serie").toString();int numero=creating?0:((Number)receiptData.value(row,"numero")).intValue();
+        work(()->ReceiptEditor.load(repository,serie,numero,creating),input->showReceiptEditor(new ReceiptEditor(input,creating),creating));
+    }
+    private void showReceiptEditor(ReceiptEditor editor,boolean creating){
+        while(JOptionPane.showConfirmDialog(this,editor,creating?"Registrar comprobante emitido":"Modificar comprobante",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION){
+            try{var draft=editor.draft();work(()->{repository.guardarComprobante(draft.header(),draft.detail(),draft.references(),creating);return true;},ignored->loadReceipts(),error->showReceiptEditor(editor,creating));return;}
+            catch(IllegalArgumentException e){showError(e);}
+        }
+    }
+    private void deleteReceipt(){
+        int row=selected(receipts);if(row<0)return;
+        String serie=receiptData.value(row,"serie").toString();int numero=((Number)receiptData.value(row,"numero")).intValue();
+        work(()->repository.ficha(serie,numero),data->{
+            if(data.rows().isEmpty()||!Boolean.TRUE.equals(data.value(0,"activo"))){status.setText("El comprobante ya no está activo.");return;}
+            if(JOptionPane.showConfirmDialog(this,"¿Dar de baja a "+serie+"-"+numero+"? Se conservarán líneas y referencias.","Baja lógica",JOptionPane.YES_NO_OPTION)!=JOptionPane.YES_OPTION)return;
+            int version=((Number)data.value(0,"version")).intValue();work(()->{repository.bajaComprobante(serie,numero,version);return true;},ignored->loadReceipts());
         });
     }
     private void loadCustomers() {
@@ -215,16 +279,19 @@ public final class GdiWindow extends JPanel {
     private JButton dbButton(String text,Runnable action) {
         JButton b=new JButton(text);b.addActionListener(e -> action.run());dbButtons.add(b);return b;
     }
-    private void setButtons(boolean enabled) { for(JButton b:dbButtons)b.setEnabled(enabled); }
-    private void clearTables(){for(JTable t:List.of(receipts,customers,reports))t.setModel(new DefaultTableModel());receiptData=null;customerData=null;}
+    private void setButtons(boolean enabled) { for(JButton b:dbButtons)b.setEnabled(enabled);catalogKind.setEnabled(enabled);includeInactive.setEnabled(enabled);catalogInactive.setEnabled(enabled); }
+    private void clearTables(){for(JTable t:List.of(receipts,customers,reports,catalog))t.setModel(new DefaultTableModel());receiptData=null;customerData=null;catalogData=null;}
     private <T> void work(Callable<T> task, Consumer<T> success) {
+        work(task,success,null);
+    }
+    private <T> void work(Callable<T> task, Consumer<T> success,Consumer<Throwable> failure) {
         connect.setEnabled(false);setButtons(false);status.setText("Consultando PostgreSQL…");
         new SwingWorker<T,Void>() {
             @Override protected T doInBackground() throws Exception {return task.call();}
             @Override protected void done() {
                 connect.setEnabled(true);setButtons(repository!=null);
                 try {success.accept(get());}
-                catch(Exception e){Throwable cause=e.getCause()==null?e:e.getCause();showError(cause);}
+                catch(Exception e){Throwable cause=e.getCause()==null?e:e.getCause();showError(cause);if(failure!=null)failure.accept(cause);}
             }
         }.execute();
     }

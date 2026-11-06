@@ -44,6 +44,16 @@ public final class UiSmoke {
             if(table.isCellEditable(0,1))throw new AssertionError("Cabecera editable");
         });
         System.out.println("PASS Swing: ordenación de cabecera con texto, entero y decimal sin excepción");
+        GdiRepository repo=new GdiRepository(DbConfig.load(Path.of(args[0])));
+        var input=ReceiptEditor.load(repo,"EB01",50,false);
+        SwingUtilities.invokeAndWait(() -> {
+            var draft=new ReceiptEditor(input,false).draft();
+            if(draft.header().get("tipo_documento")!=null||draft.detail().get(0).get("precio_unitario")!=null)throw new AssertionError("El editor convirtió NULL en un valor");
+            if(new java.math.BigDecimal("119.9999997").compareTo((java.math.BigDecimal)draft.detail().get(0).get("importe_venta"))!=0)throw new AssertionError("El editor perdió precisión");
+            if(new java.math.BigDecimal("119.9999997").compareTo(ReceiptEditor.decimal("119,9999997","importe",false,7))!=0)throw new AssertionError("No se admite coma decimal");
+            try{ReceiptEditor.decimal("1.12345678","importe",false,7);throw new AssertionError("Se redondeó una entrada con exceso de precisión");}catch(IllegalArgumentException expected){ }
+        });
+        System.out.println("PASS Editor: conserva NULL y siete decimales, admite coma decimal y rechaza exceso de precisión");
         Path output=Path.of("build/qa");Files.createDirectories(output);
         AtomicReference<GdiWindow> ref=new AtomicReference<>();
         SwingUtilities.invokeAndWait(() -> {GdiWindow w=new GdiWindow(Path.of(args[0]));w.setSize(1240,820);layout(w);ref.set(w);});

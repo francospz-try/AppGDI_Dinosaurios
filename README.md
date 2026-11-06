@@ -3,21 +3,21 @@
 Cliente de escritorio para el registro de comprobantes de Sermed Ingenieros.
 Java 21, Swing, JDBC directo y PostgreSQL. Sin ORM ni frameworks de aplicación.
 
-## Primer incremento
+## Avance al 70 %
 
-- Conexión comprobable y configuración externa.
-- Búsqueda de comprobantes por serie-número, cliente o documento (hasta 500 filas).
-- Consulta de cabecera, líneas y referencias; importes decimales exactos.
-- Alta, consulta, modificación y baja lógica de clientes.
-- Doce reportes mediante procedimientos; siete contienen JOIN.
-- Operaciones JDBC fuera del hilo de eventos de la interfaz.
+- Conexión real y configuración externa.
+- CRUD de comprobantes con cabecera, detalle y referencias en una transacción.
+- CRUD de clientes, productos/servicios, series, monedas y documentos relacionados.
+- Baja lógica e historial; conservación de asociaciones con catálogos dados de baja.
+- Control de versión para rechazar ediciones obsoletas del comprobante.
+- Trigger diferido que impide quitar la última línea, incluso con SQL directo.
+- Doce reportes por procedimientos; siete incluyen JOIN y usan comprobantes activos.
+- Decimales exactos y campos ausentes como NULL. Las operaciones JDBC se ejecutan
+  fuera del hilo de eventos de la interfaz.
 
-**Pendiente para el 70 %:** alta/edición/baja de comprobantes y sus líneas y
-referencias, mantenimiento de los demás catálogos, integridad al eliminar la última
-línea y pruebas de esos flujos. Los doce reportes conservan los ejemplos y periodos
-del informe; no todos sus parámetros son todavía editables desde la interfaz.
-La memoria, el manual Word/PDF y el empaquetado portable completo corresponden al
-cierre del proyecto. Este incremento no se presenta como aplicativo al 100 %.
+**Fuera de este avance:** memoria y manual finales Word/PDF, registro del software
+y empaquetado definitivo del 100 %. Los reportes mantienen los ejemplos y periodos
+del informe; sus parámetros no son todavía editables desde la interfaz.
 
 ## Preparación en Windows
 
@@ -49,6 +49,7 @@ El aplicativo nunca ejecuta ese script automáticamente.
 psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -f database/original/01_creacion.sql
 psql -X -v ON_ERROR_STOP=1 -U postgres -d registro_comprobantes -f database/original/02_insercion.sql
 psql -X -v ON_ERROR_STOP=1 -U postgres -d registro_comprobantes -f database/04_aplicativo.sql
+psql -X -v ON_ERROR_STOP=1 -U postgres -d registro_comprobantes -f database/07_crud_completo.sql
 psql -X -v ON_ERROR_STOP=1 -U postgres -d registro_comprobantes -f database/05_reportes.sql
 psql -X -v ON_ERROR_STOP=1 -U postgres -d registro_comprobantes -f database/06_permisos.sql
 psql -X -U postgres -d registro_comprobantes
@@ -61,7 +62,7 @@ En la sesión de psql, asigne la contraseña del rol sin escribirla en el script
 \q
 ```
 
-Para actualizar una base existente, aplique **solo** 04, 05 y 06. No vuelva a cargar
+Para actualizar una base existente, aplique **solo** 04, 07, 05 y 06, en ese orden. No vuelva a cargar
 01/02: no son migraciones. La carga original produce 5328 comprobantes con datos
 de clientes ficticios. El aplicativo no usa el superusuario postgres.
 
@@ -82,7 +83,9 @@ En Linux: `bash scripts/build.sh` y `bash scripts/run.sh`.
 ## Pruebas
 
 Use otra instancia o base **descartable** con la carga original y los scripts
-04–06. Las pruebas crean, modifican y dan de baja un cliente ficticio aleatorio.
+04→07→05→06. Cada ejecución requiere una **base de prueba recién recreada** con 01/02 y las migraciones 04→07→05→06.
+Las pruebas dejan comprobantes y catálogos ficticios con baja lógica; no se repiten
+sobre la misma carga sin restaurarla. Nunca restaure una base de trabajo para hacer pruebas.
 
 ```powershell
 $env:GDI_TEST_DATABASE = 'disposable'
@@ -106,7 +109,7 @@ Requisitos del docente: [docs/requisitos.md](docs/requisitos.md).
 | `src/main/java` | Configuración, procedimientos JDBC, operaciones e interfaz |
 | `src/test/java` | Integración y eventos/renderizado Swing |
 | `database/original` | Tres scripts originales conservados |
-| `database/04–06` | Ampliación de cliente, procedimientos, reportes y permisos |
+| `database/04–07` | Ampliación de cliente, procedimientos, reportes y permisos |
 | `config` | Plantilla de configuración externa |
 | `scripts` | Compilación, ejecución, pruebas y preparación Windows |
 | `docs` | Requisitos, diseño, plan y evidencia verificable |
