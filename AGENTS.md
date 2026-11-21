@@ -13,7 +13,14 @@ aplicación.
   `sh scripts/generar_completo.sh`; si se vuelven a crear las rutinas, ejecutar
   otra vez `08_permisos.sql`.
 - Probar con `herramientas/probar.sh` sobre una base descartable recién creada.
-  El script completo es destructivo: nunca ejecutarlo al abrir el aplicativo.
+  El script completo es destructivo: nunca ejecutarlo al abrir el aplicativo ni
+  sobre una base en uso; para una base de la versión anterior, usar
+  `scripts/migrar_desde_version_anterior.sql`.
+- No usar `upper()`, `lower()` ni `ILIKE` sobre texto del usuario: usar
+  `fn_mayusculas` y `fn_clave_busqueda`, que no dependen de la configuración
+  regional de la instancia.
+- En los scripts de `herramientas/`, calcular las rutas desde la ubicación del
+  propio script y no dejar cambiada la carpeta de trabajo.
 - No incorporar datos personales, DNI escaneados, firmas, credenciales ni
   documentos de autorización al repositorio público.
 - Aplicar Superpowers (planificación y verificación) y Matt Pocock (diseño de

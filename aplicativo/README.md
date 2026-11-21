@@ -20,13 +20,37 @@ compila con los scripts de `herramientas/` o con Maven.
 | Maven | 3.9 o superior | Opcional: `herramientas/compilar.*` compila sin Maven |
 | PostgreSQL | 17 | Servidor de la base de datos; incluye `psql` |
 
-## 1. Crear la base de datos
+## 1. Crear o migrar la base de datos
 
-Desde la carpeta del proyecto, con un usuario administrador de PostgreSQL:
+Elija **uno** de los dos caminos, con un usuario administrador de
+PostgreSQL y desde la carpeta principal:
+
+**Base nueva** (instalación inicial o base de pruebas descartable):
 
 ```sh
 psql -U postgres -d postgres -f scripts/registro_comprobantes_completo.sql
 ```
+
+> **Atención:** el script completo **elimina la base `registro_comprobantes`
+> si ya existe**, con todos sus datos. No lo ejecute sobre una base en uso.
+
+**Base existente de la versión anterior del aplicativo** (la de los
+scripts `database/` del repositorio hasta el commit b8be9b7), cuyos datos
+deben conservarse: respáldela y migre.
+
+```sh
+pg_dump -U postgres -Fc -d registro_comprobantes -f antes_de_migrar.dump
+psql -U postgres -d registro_comprobantes -f scripts/migrar_desde_version_anterior.sql
+```
+
+La migración ocurre en una sola transacción (si falla, la base no cambia):
+convierte `activo` en `eliminado`, guarda en el esquema `migracion` las bajas
+de series, monedas y documentos y las versiones de los comprobantes, que el
+esquema actual no tiene, retira el código anterior, crea las rutinas actuales
+y aplica los permisos. Comprueba que ninguna tabla pierda filas. Si se
+ejecuta otra vez, se detiene sin cambiar nada.
+
+**Base nueva**, en detalle:
 
 El script completo crea la base `registro_comprobantes` desde cero (la
 elimina si ya existe), la llena con los datos de prueba, crea las funciones,
@@ -37,7 +61,8 @@ aplicativo. Equivale a ejecutar, en orden, los scripts numerados
 `08_permisos.sql` (el primero conectado a la base `postgres`, los demás a
 `registro_comprobantes`). `03_consultas.sql` solo consulta.
 
-Después, asigne una vez la contraseña del rol (no está en ningún script):
+Después, asigne una vez la contraseña del rol (no está en ningún script;
+en una base migrada, `gdi_app` conserva la que ya tenía):
 
 ```sh
 psql -U postgres -d registro_comprobantes -c '\password gdi_app'
@@ -113,12 +138,13 @@ de cada pantalla se explica en el manual de usuario
 
 ## 5. Probar
 
-Seis programas de prueba ejecutables, sin bibliotecas de pruebas, que
+Siete programas de prueba ejecutables, sin bibliotecas de pruebas, que
 imprimen `[PASA]` o `[FALLA]` por caso y terminan con código 0 si todo pasa.
 Modifican la base, por lo que se ejecutan sobre una base **descartable**
 recién creada con el script completo, y no se repiten sin volver a crearla.
-Las cinco primeras usan el rol `gdi_app`; la de integridad, un administrador,
-porque prueba los disparadores con SQL directo. Se necesitan dos archivos de
+`PruebaConfiguracion` no usa la base; las cinco siguientes usan el rol
+`gdi_app`, y la de integridad, un administrador, porque prueba los
+disparadores con SQL directo. Se necesitan dos archivos de
 configuración, con el formato de `config/conexion.example.properties`:
 
 ```sh
@@ -130,8 +156,9 @@ En Windows: `$env:COMPROBANTES_BD_DESCARTABLE='si'` y
 
 | Clase | Casos | Qué prueba |
 |---|---|---|
+| `PruebaConfiguracion` | 6 | Archivo de configuración con datos faltantes o no válidos |
 | `PruebaConexion` | 9 | Conexión, rol sin privilegios, mensajes de error |
-| `PruebasHito30` | 9 | Consultas y omisión de filas eliminadas |
+| `PruebasHito30` | 11 | Consultas, búsqueda sin mayúsculas ni tildes, filas eliminadas |
 | `PruebasHito70` | 44 | Validación, CRUD, procedimientos y disparadores |
 | `PruebasHito100` | 22 | Doce reportes, series y monedas |
 | `PruebaInterfaz` | 4 | Pestañas reales sin abrir ventanas |
