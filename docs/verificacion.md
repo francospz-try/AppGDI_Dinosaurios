@@ -1,50 +1,51 @@
-# Verificación del avance al 70 %
+# Verificación
 
-Fecha: 5 de noviembre de 2026. Linux, OpenJDK/JDK 21.0.13, pgJDBC 42.7.7 y
-PostgreSQL 17.11. La compilación final se hizo con javac mediante scripts/build.sh;
-el script scripts/test.sh ejecutó todas las suites sobre una base descartable con
-la carga original de 5328 comprobantes.
+Fecha: 21 de noviembre de 2026. Linux, OpenJDK 21, pgJDBC 42.7.7 y
+PostgreSQL 17.12, en instancias descartables.
 
-## Comprobaciones automatizadas
+## Construcción de la base
 
-- 37 comprobaciones de conexión, consultas, clientes y doce reportes.
-- Segunda aplicación de las migraciones sin errores ni pérdida de la carga original.
-- 37 comprobaciones adicionales de CRUD de comprobantes y los cuatro catálogos auxiliares.
-- Dos pruebas de integridad: no quitar la última línea, tampoco mediante borrados concurrentes.
-- Swing: ordenación de cabecera heterogénea; editor conserva NULL y siete decimales;
-  coma decimal y rechazo de exceso de precisión; conexión y carga real de listas.
-- Duplicados y referencias inválidas revierten la transacción completa.
-- Edición obsoleta rechazada; corrección de documento relacionado invalida las versiones anteriores.
-- Baja lógica consultable en historial sin eliminar líneas o referencias.
+- `scripts/registro_comprobantes_completo.sql` en una instancia vacía: sin
+  errores, en unos 2,4 s. Los scripts numerados ejecutados uno por uno dejan
+  exactamente los mismos datos (huella MD5 de cada tabla y lista de rutinas).
+- Resultado: 5631 comprobantes (4 eliminados), 949 clientes (2 dados de baja),
+  42 productos o servicios (1 dado de baja), 41 rutinas, 4 disparadores.
+- `08_permisos.sql`: `gdi_app` ejecuta 38 rutinas, lee las 8 tablas y no puede
+  modificar ninguna.
 
-Se observaron fallos antes de corregir la búsqueda con ceros impresos, la búsqueda
-de CLIENTES VARIOS y la ordenación de valores de cabecera. Se verificaron después
-con las mismas condiciones de reproducción.
+## Pruebas automáticas
 
-## Ejecución gráfica real
+Ejecutadas con `herramientas/probar.sh` (y con `herramientas/probar.ps1` en
+PowerShell 7) sobre una base recién creada; las cinco primeras clases con el
+rol `gdi_app`, la de integridad con un administrador.
 
-Se abrió el aplicativo Java en el escritorio Linux y se operó con teclado y ratón:
+| Clase | Resultado | Qué prueba |
+|---|---|---|
+| `PruebaConexion` | 9 de 9 | Conexión, tablas reales, cierre de recursos, rol sin privilegios que no puede escribir directo, mensajes ante contraseña errónea, servidor apagado y base inexistente |
+| `PruebasHito30` | 9 de 9 | Búsquedas, periodo, detalle y omisión de filas eliminadas |
+| `PruebasHito70` | 44 de 44 | Validación, CRUD de clientes, productos y comprobantes, procedimientos, disparadores y atomicidad |
+| `PruebasHito100` | 22 de 22 | Los doce reportes (definición, JOIN, exclusión de eliminados, resultados) y registro de series y monedas |
+| `PruebaInterfaz` | 4 de 4 | Pestañas reales construidas sin ventanas, usadas y verificadas por su contenido |
+| `PruebaIntegridad` | 3 de 3 | Con SQL directo: última línea, total que no cuadra y borrados simultáneos de las dos líneas de un comprobante |
+| **Total** | **91 de 91** | |
 
-1. Conectar a la instancia PostgreSQL de prueba con el rol gdi_app.
-2. Registrar B001-90000001, total 118.00, una línea de detalle y TEST-GUI-70 como referencia.
-3. Verificar su aparición en la lista y abrirlo para editar.
-4. Cambiar observación a EDITADO GUI 70 y comprobar que persistió.
-5. Comprobar que la referencia se conservó.
-6. Dar de baja y consultar B001-90000001 con Incluir bajas: aparece inactivo.
-7. Ejecutar el primer reporte desde la ventana: ocho filas de los datos de prueba.
+## Recorrido de la interfaz
 
-El entorno inicial solo tenía Java sin librerías de escritorio y sin javac. Para
-esta verificación se preparó un JDK con las librerías gráficas oficiales de Debian
-en el entorno de pruebas; no se modificó el equipo Windows del usuario.
+Con la base completa se recorrieron, sin abrir ventanas en el escritorio, todas
+las funciones como lo haría un usuario (conexión, registro, modificación,
+eliminación y restauración de un comprobante, CRUD de clientes y productos, los
+doce reportes, series y monedas), comprobando en la base el efecto de cada una.
+Las capturas del manual provienen de ese recorrido.
 
-## Condiciones y límites
+## Límites
 
-Las suites de CRUD usan identificadores reservados de prueba y **requieren restaurar
-la base descartable antes de cada ejecución**. Dejan registros y bajas lógicas;
-no son pruebas para ejecutar sobre una base de trabajo. Orden de las migraciones:
-04 → 07 → 05 → 06. Los scripts 01/02 solo inicializan o recrean la carga de prueba.
+- `Iniciar.cmd` y los scripts `.ps1` no se ejecutaron en un Windows real: los
+  `.ps1` se probaron con PowerShell 7 en Linux.
+- Las pruebas dejan datos de prueba y bajas lógicas: no se repiten sin volver
+  a crear la base.
 
-No se ha ejecutado en el Windows del usuario ni se ha validado allí PowerShell,
-el doble clic o las junctions de habilidades. El avance del 70 % corresponde al
-alcance funcional probado aquí; queda la demostración en el equipo de entrega.
-No se incluyen todavía manual/memoria Word/PDF ni el paquete final del 100 %.
+## Versión anterior
+
+La implementación anterior de este repositorio (paquete `pe.edu.ucsm.gdi`,
+scripts `database/04`–`07`) se construyó y probó en las mismas condiciones
+antes de integrarla: 79 de 79 comprobaciones. Queda en el historial de Git.

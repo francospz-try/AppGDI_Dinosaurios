@@ -1,4 +1,10 @@
 @echo off
-cd /d "%~dp0"
-java -cp "build\gdi.jar;lib\postgresql-42.7.7.jar" pe.edu.ucsm.gdi.Main
-if errorlevel 1 pause
+rem Abre el aplicativo de registro de comprobantes de pago desde esta carpeta.
+rem Compile antes con herramientas\compilar.ps1 (o mvn package en aplicativo).
+cd /d "%~dp0aplicativo"
+if not exist target\registro-comprobantes.jar (
+  echo Falta aplicativo\target\registro-comprobantes.jar. Compile con herramientas\compilar.ps1.
+  pause
+  exit /b 1
+)
+start "" javaw -jar target\registro-comprobantes.jar

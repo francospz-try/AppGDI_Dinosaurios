@@ -1,6 +1,8 @@
-build/
-lib/
-config/database.properties
+# Compilación (Maven o herramientas/compilar.*) y controlador descargado
+aplicativo/target/
+aplicativo/lib/
+# Configuración real con credenciales: no se versiona
+aplicativo/config/conexion.properties
 *.log
 .idea/
 .vscode/
