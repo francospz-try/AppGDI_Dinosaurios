@@ -14,7 +14,10 @@
 -- de su dueño (SECURITY DEFINER) y con search_path fijo.
 -- La contraseña no se escribe aquí; se asigna una vez, desde psql:
 --   \password gdi_app
--- El script puede ejecutarse varias veces.
+-- El script puede ejecutarse varias veces y sobre una base existente: no
+-- borra ningún objeto ni dato; primero retira todos los permisos que el
+-- rol tuviera (incluidos los de una versión anterior que le permitía
+-- escribir en las tablas) y luego concede solo los necesarios.
 -- =====================================================================
 
 \set ON_ERROR_STOP on
@@ -27,6 +30,24 @@ BEGIN
 END;
 $$;
 
+-- Se parte de cero: ningún permiso anterior del rol sobrevive
+REVOKE ALL ON DATABASE registro_comprobantes FROM gdi_app;
+REVOKE ALL ON SCHEMA public FROM gdi_app;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM gdi_app;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM gdi_app;
+REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM gdi_app;
+DO $$
+BEGIN
+  -- Esquema de la versión anterior del aplicativo, si todavía existe
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'app') THEN
+    REVOKE ALL ON ALL TABLES IN SCHEMA app FROM gdi_app;
+    REVOKE ALL ON ALL ROUTINES IN SCHEMA app FROM gdi_app;
+    REVOKE ALL ON SCHEMA app FROM gdi_app;
+  END IF;
+END;
+$$;
+
+-- Solo lo necesario: conectarse, leer las tablas y ejecutar las rutinas
 GRANT CONNECT ON DATABASE registro_comprobantes TO gdi_app;
 GRANT USAGE ON SCHEMA public TO gdi_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO gdi_app;
@@ -75,6 +96,6 @@ SELECT 'tablas legibles', count(*) FILTER (WHERE has_table_privilege('gdi_app', 
  WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
 UNION ALL
 SELECT 'tablas modificables',
-       count(*) FILTER (WHERE has_table_privilege('gdi_app', c.oid, 'INSERT,UPDATE,DELETE'))
+       count(*) FILTER (WHERE has_table_privilege('gdi_app', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE'))
   FROM pg_class c
  WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r';

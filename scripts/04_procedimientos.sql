@@ -17,6 +17,23 @@
 \set ON_ERROR_STOP on
 
 -- ---------------------------------------------------------------------
+-- Texto independiente de la configuración regional de la instancia: con
+-- la configuración C, upper() y ILIKE no tratan las letras con tilde ni
+-- la ñ. fn_mayusculas las convierte antes de upper(); fn_clave_busqueda
+-- las lleva a ASCII en minúsculas, para buscar sin distinguir mayúsculas
+-- ni tildes («clinica» encuentra «CLÍNICA»; la ñ se busca como n).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_mayusculas(p_texto varchar)
+RETURNS varchar LANGUAGE sql IMMUTABLE AS $$
+  SELECT upper(translate(p_texto, 'áéíóúüñàèìòùâêîôûäëïöç', 'ÁÉÍÓÚÜÑÀÈÌÒÙÂÊÎÔÛÄËÏÖÇ'));
+$$;
+
+CREATE OR REPLACE FUNCTION fn_clave_busqueda(p_texto varchar)
+RETURNS varchar LANGUAGE sql IMMUTABLE AS $$
+  SELECT lower(translate(p_texto, 'ÁÉÍÓÚÜÑÀÈÌÒÙÂÊÎÔÛÄËÏÖÇáéíóúüñàèìòùâêîôûäëïöç', 'AEIOUUNAEIOUAEIOUAEIOCaeiouunaeiouaeiouaeioc'));
+$$;
+
+-- ---------------------------------------------------------------------
 -- Catálogos para los formularios
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_listar_series()
@@ -37,7 +54,8 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- Búsqueda de clientes por número de documento (inicio) o por nombre
--- (cualquier parte, sin distinguir mayúsculas). Texto vacío: todos.
+-- (cualquier parte, sin distinguir mayúsculas ni tildes). Texto vacío:
+-- todos.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_buscar_clientes(p_texto varchar, p_limite integer)
 RETURNS TABLE (tipo_documento varchar, numero_documento varchar,
@@ -54,7 +72,8 @@ LANGUAGE sql STABLE AS $$
    WHERE NOT cl.eliminado
      AND (coalesce(p_texto, '') = ''
           OR cl.numero_documento LIKE p_texto || '%'
-          OR cl.nombre_razon_social ILIKE '%' || p_texto || '%')
+          OR fn_clave_busqueda(cl.nombre_razon_social)
+             LIKE '%' || fn_clave_busqueda(p_texto) || '%')
    ORDER BY cl.nombre_razon_social, cl.numero_documento
    LIMIT p_limite;
 $$;
@@ -73,8 +92,8 @@ LANGUAGE sql STABLE AS $$
     FROM producto_servicio p
    WHERE NOT p.eliminado
      AND (coalesce(p_texto, '') = ''
-          OR p.codigo ILIKE p_texto || '%'
-          OR p.descripcion ILIKE '%' || p_texto || '%')
+          OR fn_clave_busqueda(p.codigo) LIKE fn_clave_busqueda(p_texto) || '%'
+          OR fn_clave_busqueda(p.descripcion) LIKE '%' || fn_clave_busqueda(p_texto) || '%')
    ORDER BY p.codigo
    LIMIT p_limite;
 $$;

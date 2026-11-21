@@ -41,7 +41,7 @@ LANGUAGE sql STABLE AS $$
           AND cl.numero_documento = c.numero_documento
    WHERE NOT c.eliminado
      AND c.fecha_emision BETWEEN p_desde AND p_hasta
-     AND (fn_limpiar(p_serie) IS NULL OR c.serie = upper(btrim(p_serie)))
+     AND (fn_limpiar(p_serie) IS NULL OR c.serie = fn_mayusculas(btrim(p_serie)))
    ORDER BY c.fecha_emision, c.serie, c.numero;
 $$;
 
@@ -65,7 +65,7 @@ LANGUAGE sql STABLE AS $$
     JOIN incluye i ON i.serie = c.serie AND i.numero = c.numero
     JOIN producto_servicio p ON p.codigo = i.codigo
    WHERE NOT c.eliminado
-     AND c.serie = upper(btrim(p_serie)) AND c.numero = p_numero
+     AND c.serie = fn_mayusculas(btrim(p_serie)) AND c.numero = p_numero
    ORDER BY p.codigo;
 $$;
 
@@ -118,7 +118,7 @@ LANGUAGE sql STABLE AS $$
    WHERE NOT c.eliminado
      AND (fn_limpiar(p_tipo_relacionado) IS NULL
           OR r.tipo_relacionado = p_tipo_relacionado)
-     AND r.numero_relacionado LIKE coalesce(upper(btrim(p_numero_relacionado)), '') || '%'
+     AND r.numero_relacionado LIKE coalesce(fn_mayusculas(btrim(p_numero_relacionado)), '') || '%'
    ORDER BY r.tipo_relacionado, r.numero_relacionado, c.serie, c.numero
    LIMIT 500;
 $$;
@@ -265,7 +265,7 @@ LANGUAGE sql STABLE AS $$
     JOIN producto_servicio p ON p.codigo = i.codigo
    WHERE NOT c.eliminado
      AND NOT p.eliminado
-     AND p.codigo = upper(btrim(p_codigo))
+     AND p.codigo = fn_mayusculas(btrim(p_codigo))
    GROUP BY 1
    ORDER BY 1;
 $$;
@@ -284,7 +284,7 @@ LANGUAGE sql STABLE AS $$
                  lag(c.numero) OVER (PARTITION BY c.serie ORDER BY c.numero) AS anterior
             FROM comprobante c
            WHERE NOT c.eliminado
-             AND (fn_limpiar(p_serie) IS NULL OR c.serie = upper(btrim(p_serie)))) n
+             AND (fn_limpiar(p_serie) IS NULL OR c.serie = fn_mayusculas(btrim(p_serie)))) n
    WHERE n.numero - n.anterior > 1
    ORDER BY n.serie, n.numero;
 $$;
@@ -328,12 +328,12 @@ $$;
 CREATE OR REPLACE PROCEDURE sp_insertar_serie(p_serie varchar, p_tipo_comprobante varchar)
 LANGUAGE plpgsql AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM serie_comprobante WHERE serie = upper(btrim(p_serie))) THEN
-    RAISE EXCEPTION 'La serie % ya está registrada.', upper(btrim(p_serie))
+  IF EXISTS (SELECT 1 FROM serie_comprobante WHERE serie = fn_mayusculas(btrim(p_serie))) THEN
+    RAISE EXCEPTION 'La serie % ya está registrada.', fn_mayusculas(btrim(p_serie))
       USING ERRCODE = 'unique_violation';
   END IF;
   INSERT INTO serie_comprobante (serie, tipo_comprobante)
-  VALUES (upper(btrim(p_serie)), fn_limpiar(p_tipo_comprobante));
+  VALUES (fn_mayusculas(btrim(p_serie)), fn_limpiar(p_tipo_comprobante));
 END;
 $$;
 
@@ -341,11 +341,11 @@ $$;
 CREATE OR REPLACE PROCEDURE sp_insertar_moneda(p_codigo_moneda varchar, p_nombre_moneda varchar)
 LANGUAGE plpgsql AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM moneda WHERE codigo_moneda = upper(btrim(p_codigo_moneda))) THEN
-    RAISE EXCEPTION 'La moneda % ya está registrada.', upper(btrim(p_codigo_moneda))
+  IF EXISTS (SELECT 1 FROM moneda WHERE codigo_moneda = fn_mayusculas(btrim(p_codigo_moneda))) THEN
+    RAISE EXCEPTION 'La moneda % ya está registrada.', fn_mayusculas(btrim(p_codigo_moneda))
       USING ERRCODE = 'unique_violation';
   END IF;
   INSERT INTO moneda (codigo_moneda, nombre_moneda)
-  VALUES (upper(btrim(p_codigo_moneda)), upper(fn_limpiar(p_nombre_moneda)));
+  VALUES (fn_mayusculas(btrim(p_codigo_moneda)), fn_mayusculas(fn_limpiar(p_nombre_moneda)));
 END;
 $$;

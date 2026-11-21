@@ -688,6 +688,23 @@ UNION ALL SELECT 'referencia', count(*) FROM referencia;
 \set ON_ERROR_STOP on
 
 -- ---------------------------------------------------------------------
+-- Texto independiente de la configuración regional de la instancia: con
+-- la configuración C, upper() y ILIKE no tratan las letras con tilde ni
+-- la ñ. fn_mayusculas las convierte antes de upper(); fn_clave_busqueda
+-- las lleva a ASCII en minúsculas, para buscar sin distinguir mayúsculas
+-- ni tildes («clinica» encuentra «CLÍNICA»; la ñ se busca como n).
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_mayusculas(p_texto varchar)
+RETURNS varchar LANGUAGE sql IMMUTABLE AS $$
+  SELECT upper(translate(p_texto, 'áéíóúüñàèìòùâêîôûäëïöç', 'ÁÉÍÓÚÜÑÀÈÌÒÙÂÊÎÔÛÄËÏÖÇ'));
+$$;
+
+CREATE OR REPLACE FUNCTION fn_clave_busqueda(p_texto varchar)
+RETURNS varchar LANGUAGE sql IMMUTABLE AS $$
+  SELECT lower(translate(p_texto, 'ÁÉÍÓÚÜÑÀÈÌÒÙÂÊÎÔÛÄËÏÖÇáéíóúüñàèìòùâêîôûäëïöç', 'AEIOUUNAEIOUAEIOUAEIOCaeiouunaeiouaeiouaeioc'));
+$$;
+
+-- ---------------------------------------------------------------------
 -- Catálogos para los formularios
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_listar_series()
@@ -708,7 +725,8 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- Búsqueda de clientes por número de documento (inicio) o por nombre
--- (cualquier parte, sin distinguir mayúsculas). Texto vacío: todos.
+-- (cualquier parte, sin distinguir mayúsculas ni tildes). Texto vacío:
+-- todos.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_buscar_clientes(p_texto varchar, p_limite integer)
 RETURNS TABLE (tipo_documento varchar, numero_documento varchar,
@@ -725,7 +743,8 @@ LANGUAGE sql STABLE AS $$
    WHERE NOT cl.eliminado
      AND (coalesce(p_texto, '') = ''
           OR cl.numero_documento LIKE p_texto || '%'
-          OR cl.nombre_razon_social ILIKE '%' || p_texto || '%')
+          OR fn_clave_busqueda(cl.nombre_razon_social)
+             LIKE '%' || fn_clave_busqueda(p_texto) || '%')
    ORDER BY cl.nombre_razon_social, cl.numero_documento
    LIMIT p_limite;
 $$;
@@ -744,8 +763,8 @@ LANGUAGE sql STABLE AS $$
     FROM producto_servicio p
    WHERE NOT p.eliminado
      AND (coalesce(p_texto, '') = ''
-          OR p.codigo ILIKE p_texto || '%'
-          OR p.descripcion ILIKE '%' || p_texto || '%')
+          OR fn_clave_busqueda(p.codigo) LIKE fn_clave_busqueda(p_texto) || '%'
+          OR fn_clave_busqueda(p.descripcion) LIKE '%' || fn_clave_busqueda(p_texto) || '%')
    ORDER BY p.codigo
    LIMIT p_limite;
 $$;
@@ -881,22 +900,22 @@ DECLARE
 BEGIN
   SELECT eliminado INTO v_eliminado
     FROM cliente
-   WHERE tipo_documento = upper(btrim(p_tipo_documento))
+   WHERE tipo_documento = fn_mayusculas(btrim(p_tipo_documento))
      AND numero_documento = btrim(p_numero_documento);
   IF v_eliminado IS FALSE THEN
-    RAISE EXCEPTION 'Ya existe un cliente con % %.', upper(btrim(p_tipo_documento)),
+    RAISE EXCEPTION 'Ya existe un cliente con % %.', fn_mayusculas(btrim(p_tipo_documento)),
       btrim(p_numero_documento) USING ERRCODE = 'unique_violation';
   ELSIF v_eliminado IS TRUE THEN
     UPDATE cliente
-       SET nombre_razon_social = upper(fn_limpiar(p_nombre)),
-           direccion = upper(fn_limpiar(p_direccion)),
+       SET nombre_razon_social = fn_mayusculas(fn_limpiar(p_nombre)),
+           direccion = fn_mayusculas(fn_limpiar(p_direccion)),
            eliminado = FALSE
-     WHERE tipo_documento = upper(btrim(p_tipo_documento))
+     WHERE tipo_documento = fn_mayusculas(btrim(p_tipo_documento))
        AND numero_documento = btrim(p_numero_documento);
   ELSE
     INSERT INTO cliente (tipo_documento, numero_documento, nombre_razon_social, direccion)
-    VALUES (upper(btrim(p_tipo_documento)), btrim(p_numero_documento),
-            coalesce(upper(fn_limpiar(p_nombre)), ''), upper(fn_limpiar(p_direccion)));
+    VALUES (fn_mayusculas(btrim(p_tipo_documento)), btrim(p_numero_documento),
+            coalesce(fn_mayusculas(fn_limpiar(p_nombre)), ''), fn_mayusculas(fn_limpiar(p_direccion)));
   END IF;
 END;
 $$;
@@ -908,8 +927,8 @@ CREATE OR REPLACE PROCEDURE sp_modificar_cliente(
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE cliente
-     SET nombre_razon_social = coalesce(upper(fn_limpiar(p_nombre)), ''),
-         direccion = upper(fn_limpiar(p_direccion))
+     SET nombre_razon_social = coalesce(fn_mayusculas(fn_limpiar(p_nombre)), ''),
+         direccion = fn_mayusculas(fn_limpiar(p_direccion))
    WHERE tipo_documento = p_tipo_documento
      AND numero_documento = p_numero_documento
      AND NOT eliminado;
@@ -947,21 +966,21 @@ DECLARE
   v_eliminado boolean;
 BEGIN
   SELECT eliminado INTO v_eliminado FROM producto_servicio
-   WHERE codigo = upper(btrim(p_codigo));
+   WHERE codigo = fn_mayusculas(btrim(p_codigo));
   IF v_eliminado IS FALSE THEN
     RAISE EXCEPTION 'Ya existe un producto o servicio con el código %.',
-      upper(btrim(p_codigo)) USING ERRCODE = 'unique_violation';
+      fn_mayusculas(btrim(p_codigo)) USING ERRCODE = 'unique_violation';
   ELSIF v_eliminado IS TRUE THEN
     UPDATE producto_servicio
-       SET descripcion = coalesce(upper(fn_limpiar(p_descripcion)), ''),
-           unidad_medida = upper(btrim(p_unidad_medida)),
+       SET descripcion = coalesce(fn_mayusculas(fn_limpiar(p_descripcion)), ''),
+           unidad_medida = fn_mayusculas(btrim(p_unidad_medida)),
            eliminado = FALSE
-     WHERE codigo = upper(btrim(p_codigo));
+     WHERE codigo = fn_mayusculas(btrim(p_codigo));
   ELSE
     INSERT INTO producto_servicio (codigo, descripcion, unidad_medida)
-    VALUES (coalesce(upper(btrim(p_codigo)), ''),
-            coalesce(upper(fn_limpiar(p_descripcion)), ''),
-            upper(btrim(p_unidad_medida)));
+    VALUES (coalesce(fn_mayusculas(btrim(p_codigo)), ''),
+            coalesce(fn_mayusculas(fn_limpiar(p_descripcion)), ''),
+            fn_mayusculas(btrim(p_unidad_medida)));
   END IF;
 END;
 $$;
@@ -971,8 +990,8 @@ CREATE OR REPLACE PROCEDURE sp_modificar_producto(
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE producto_servicio
-     SET descripcion = coalesce(upper(fn_limpiar(p_descripcion)), ''),
-         unidad_medida = upper(btrim(p_unidad_medida))
+     SET descripcion = coalesce(fn_mayusculas(fn_limpiar(p_descripcion)), ''),
+         unidad_medida = fn_mayusculas(btrim(p_unidad_medida))
    WHERE codigo = p_codigo AND NOT eliminado;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'No existe un producto o servicio vigente con el código %.',
@@ -1070,7 +1089,7 @@ BEGIN
              importe_venta numeric)
   LOOP
     IF NOT EXISTS (SELECT 1 FROM producto_servicio p
-                    WHERE p.codigo = upper(btrim(r.codigo))) THEN
+                    WHERE p.codigo = fn_mayusculas(btrim(r.codigo))) THEN
       IF fn_limpiar(r.descripcion) IS NULL OR fn_limpiar(r.unidad_medida) IS NULL THEN
         RAISE EXCEPTION 'El producto o servicio % no existe: indique su descripción y unidad de medida.',
           r.codigo USING ERRCODE = 'foreign_key_violation';
@@ -1078,11 +1097,11 @@ BEGIN
       CALL sp_insertar_producto(r.codigo, r.descripcion, r.unidad_medida);
     ELSE
       UPDATE producto_servicio SET eliminado = FALSE
-       WHERE codigo = upper(btrim(r.codigo)) AND eliminado;
+       WHERE codigo = fn_mayusculas(btrim(r.codigo)) AND eliminado;
     END IF;
     INSERT INTO incluye (serie, numero, codigo, cantidad, valor_unitario,
                          precio_unitario, descuento, importe_venta)
-    VALUES (p_serie, p_numero, upper(btrim(r.codigo)), r.cantidad, r.valor_unitario,
+    VALUES (p_serie, p_numero, fn_mayusculas(btrim(r.codigo)), r.cantidad, r.valor_unitario,
             r.precio_unitario, coalesce(r.descuento, 0), r.importe_venta);
   END LOOP;
 
@@ -1090,10 +1109,10 @@ BEGIN
              AS x(tipo_relacionado text, numero_relacionado text)
   LOOP
     INSERT INTO documento_relacionado (tipo_relacionado, numero_relacionado)
-    VALUES (r.tipo_relacionado, upper(btrim(r.numero_relacionado)))
+    VALUES (r.tipo_relacionado, fn_mayusculas(btrim(r.numero_relacionado)))
     ON CONFLICT DO NOTHING;
     INSERT INTO referencia (serie, numero, tipo_relacionado, numero_relacionado)
-    VALUES (p_serie, p_numero, r.tipo_relacionado, upper(btrim(r.numero_relacionado)));
+    VALUES (p_serie, p_numero, r.tipo_relacionado, fn_mayusculas(btrim(r.numero_relacionado)));
   END LOOP;
 END;
 $$;
@@ -1140,16 +1159,16 @@ BEGIN
       -- innecesarias en cada comprobante del mismo cliente
       UPDATE cliente
          SET eliminado = FALSE,
-             nombre_razon_social = coalesce(upper(fn_limpiar(p_nombre_cliente)),
+             nombre_razon_social = coalesce(fn_mayusculas(fn_limpiar(p_nombre_cliente)),
                                             nombre_razon_social),
-             direccion = coalesce(upper(fn_limpiar(p_direccion_cliente)), direccion)
+             direccion = coalesce(fn_mayusculas(fn_limpiar(p_direccion_cliente)), direccion)
        WHERE tipo_documento = p_tipo_documento
          AND numero_documento = p_numero_documento
          AND (eliminado
               OR nombre_razon_social IS DISTINCT FROM
-                 coalesce(upper(fn_limpiar(p_nombre_cliente)), nombre_razon_social)
+                 coalesce(fn_mayusculas(fn_limpiar(p_nombre_cliente)), nombre_razon_social)
               OR direccion IS DISTINCT FROM
-                 coalesce(upper(fn_limpiar(p_direccion_cliente)), direccion));
+                 coalesce(fn_mayusculas(fn_limpiar(p_direccion_cliente)), direccion));
     END IF;
   END IF;
 
@@ -1159,7 +1178,7 @@ BEGIN
     otros_tributos, monto_redondeo, importe_total, percepcion,
     tipo_documento, numero_documento)
   VALUES (p_serie, p_numero, p_fecha_emision, p_fecha_vencimiento,
-    p_codigo_moneda, upper(fn_limpiar(p_forma_pago)), upper(fn_limpiar(p_medio_pago)),
+    p_codigo_moneda, fn_mayusculas(fn_limpiar(p_forma_pago)), fn_mayusculas(fn_limpiar(p_medio_pago)),
     fn_limpiar(p_observacion), p_op_gravada, coalesce(p_op_exonerada, 0),
     coalesce(p_op_inafecta, 0), p_op_gratuita, p_isc, p_igv, p_otros_cargos,
     p_otros_tributos, p_monto_redondeo, p_importe_total, p_percepcion,
@@ -1207,8 +1226,8 @@ BEGIN
 
   UPDATE comprobante
      SET fecha_emision = p_fecha_emision, fecha_vencimiento = p_fecha_vencimiento,
-         codigo_moneda = p_codigo_moneda, forma_pago = upper(fn_limpiar(p_forma_pago)),
-         medio_pago = upper(fn_limpiar(p_medio_pago)),
+         codigo_moneda = p_codigo_moneda, forma_pago = fn_mayusculas(fn_limpiar(p_forma_pago)),
+         medio_pago = fn_mayusculas(fn_limpiar(p_medio_pago)),
          observacion = fn_limpiar(p_observacion),
          op_gravada = p_op_gravada, op_exonerada = coalesce(p_op_exonerada, 0),
          op_inafecta = coalesce(p_op_inafecta, 0), op_gratuita = p_op_gratuita,
@@ -1405,7 +1424,7 @@ LANGUAGE sql STABLE AS $$
           AND cl.numero_documento = c.numero_documento
    WHERE NOT c.eliminado
      AND c.fecha_emision BETWEEN p_desde AND p_hasta
-     AND (fn_limpiar(p_serie) IS NULL OR c.serie = upper(btrim(p_serie)))
+     AND (fn_limpiar(p_serie) IS NULL OR c.serie = fn_mayusculas(btrim(p_serie)))
    ORDER BY c.fecha_emision, c.serie, c.numero;
 $$;
 
@@ -1429,7 +1448,7 @@ LANGUAGE sql STABLE AS $$
     JOIN incluye i ON i.serie = c.serie AND i.numero = c.numero
     JOIN producto_servicio p ON p.codigo = i.codigo
    WHERE NOT c.eliminado
-     AND c.serie = upper(btrim(p_serie)) AND c.numero = p_numero
+     AND c.serie = fn_mayusculas(btrim(p_serie)) AND c.numero = p_numero
    ORDER BY p.codigo;
 $$;
 
@@ -1482,7 +1501,7 @@ LANGUAGE sql STABLE AS $$
    WHERE NOT c.eliminado
      AND (fn_limpiar(p_tipo_relacionado) IS NULL
           OR r.tipo_relacionado = p_tipo_relacionado)
-     AND r.numero_relacionado LIKE coalesce(upper(btrim(p_numero_relacionado)), '') || '%'
+     AND r.numero_relacionado LIKE coalesce(fn_mayusculas(btrim(p_numero_relacionado)), '') || '%'
    ORDER BY r.tipo_relacionado, r.numero_relacionado, c.serie, c.numero
    LIMIT 500;
 $$;
@@ -1629,7 +1648,7 @@ LANGUAGE sql STABLE AS $$
     JOIN producto_servicio p ON p.codigo = i.codigo
    WHERE NOT c.eliminado
      AND NOT p.eliminado
-     AND p.codigo = upper(btrim(p_codigo))
+     AND p.codigo = fn_mayusculas(btrim(p_codigo))
    GROUP BY 1
    ORDER BY 1;
 $$;
@@ -1648,7 +1667,7 @@ LANGUAGE sql STABLE AS $$
                  lag(c.numero) OVER (PARTITION BY c.serie ORDER BY c.numero) AS anterior
             FROM comprobante c
            WHERE NOT c.eliminado
-             AND (fn_limpiar(p_serie) IS NULL OR c.serie = upper(btrim(p_serie)))) n
+             AND (fn_limpiar(p_serie) IS NULL OR c.serie = fn_mayusculas(btrim(p_serie)))) n
    WHERE n.numero - n.anterior > 1
    ORDER BY n.serie, n.numero;
 $$;
@@ -1692,12 +1711,12 @@ $$;
 CREATE OR REPLACE PROCEDURE sp_insertar_serie(p_serie varchar, p_tipo_comprobante varchar)
 LANGUAGE plpgsql AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM serie_comprobante WHERE serie = upper(btrim(p_serie))) THEN
-    RAISE EXCEPTION 'La serie % ya está registrada.', upper(btrim(p_serie))
+  IF EXISTS (SELECT 1 FROM serie_comprobante WHERE serie = fn_mayusculas(btrim(p_serie))) THEN
+    RAISE EXCEPTION 'La serie % ya está registrada.', fn_mayusculas(btrim(p_serie))
       USING ERRCODE = 'unique_violation';
   END IF;
   INSERT INTO serie_comprobante (serie, tipo_comprobante)
-  VALUES (upper(btrim(p_serie)), fn_limpiar(p_tipo_comprobante));
+  VALUES (fn_mayusculas(btrim(p_serie)), fn_limpiar(p_tipo_comprobante));
 END;
 $$;
 
@@ -1705,12 +1724,12 @@ $$;
 CREATE OR REPLACE PROCEDURE sp_insertar_moneda(p_codigo_moneda varchar, p_nombre_moneda varchar)
 LANGUAGE plpgsql AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM moneda WHERE codigo_moneda = upper(btrim(p_codigo_moneda))) THEN
-    RAISE EXCEPTION 'La moneda % ya está registrada.', upper(btrim(p_codigo_moneda))
+  IF EXISTS (SELECT 1 FROM moneda WHERE codigo_moneda = fn_mayusculas(btrim(p_codigo_moneda))) THEN
+    RAISE EXCEPTION 'La moneda % ya está registrada.', fn_mayusculas(btrim(p_codigo_moneda))
       USING ERRCODE = 'unique_violation';
   END IF;
   INSERT INTO moneda (codigo_moneda, nombre_moneda)
-  VALUES (upper(btrim(p_codigo_moneda)), upper(fn_limpiar(p_nombre_moneda)));
+  VALUES (fn_mayusculas(btrim(p_codigo_moneda)), fn_mayusculas(fn_limpiar(p_nombre_moneda)));
 END;
 $$;
 
@@ -2044,7 +2063,10 @@ UNION ALL SELECT 'referencia', count(*), NULL FROM referencia;
 -- de su dueño (SECURITY DEFINER) y con search_path fijo.
 -- La contraseña no se escribe aquí; se asigna una vez, desde psql:
 --   \password gdi_app
--- El script puede ejecutarse varias veces.
+-- El script puede ejecutarse varias veces y sobre una base existente: no
+-- borra ningún objeto ni dato; primero retira todos los permisos que el
+-- rol tuviera (incluidos los de una versión anterior que le permitía
+-- escribir en las tablas) y luego concede solo los necesarios.
 -- =====================================================================
 
 \set ON_ERROR_STOP on
@@ -2057,6 +2079,24 @@ BEGIN
 END;
 $$;
 
+-- Se parte de cero: ningún permiso anterior del rol sobrevive
+REVOKE ALL ON DATABASE registro_comprobantes FROM gdi_app;
+REVOKE ALL ON SCHEMA public FROM gdi_app;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM gdi_app;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM gdi_app;
+REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM gdi_app;
+DO $$
+BEGIN
+  -- Esquema de la versión anterior del aplicativo, si todavía existe
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'app') THEN
+    REVOKE ALL ON ALL TABLES IN SCHEMA app FROM gdi_app;
+    REVOKE ALL ON ALL ROUTINES IN SCHEMA app FROM gdi_app;
+    REVOKE ALL ON SCHEMA app FROM gdi_app;
+  END IF;
+END;
+$$;
+
+-- Solo lo necesario: conectarse, leer las tablas y ejecutar las rutinas
 GRANT CONNECT ON DATABASE registro_comprobantes TO gdi_app;
 GRANT USAGE ON SCHEMA public TO gdi_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO gdi_app;
@@ -2105,6 +2145,6 @@ SELECT 'tablas legibles', count(*) FILTER (WHERE has_table_privilege('gdi_app', 
  WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
 UNION ALL
 SELECT 'tablas modificables',
-       count(*) FILTER (WHERE has_table_privilege('gdi_app', c.oid, 'INSERT,UPDATE,DELETE'))
+       count(*) FILTER (WHERE has_table_privilege('gdi_app', c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE'))
   FROM pg_class c
  WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r';

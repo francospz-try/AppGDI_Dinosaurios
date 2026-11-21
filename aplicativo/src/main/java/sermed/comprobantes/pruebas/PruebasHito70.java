@@ -119,6 +119,7 @@ public final class PruebasHito70 {
             clientes.insertar(cliente("RUC", "20111111111", "  Clínica   Nueva  S.A.C. ", "Av. Ejército 101"));
             Cliente c = unicoCliente(clientes, "20111111111");
             comprobar(c.nombreRazonSocial().equals("CLÍNICA NUEVA S.A.C."), c.nombreRazonSocial());
+            comprobar("AV. EJÉRCITO 101".equals(c.direccion()), c.direccion());
             return c.nombreRazonSocial() + "; " + c.direccion();
         });
         v.caso("C2 Registrar un documento repetido: clave duplicada", () ->

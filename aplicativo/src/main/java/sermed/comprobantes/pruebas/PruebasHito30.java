@@ -65,6 +65,22 @@ public final class PruebasHito30 {
             return r.size() + " cliente(s)";
         });
 
+        v.caso("F6 Busca clientes sin tildes ni mayúsculas, en cualquier configuración regional", () -> {
+            List<Cliente> r = clientes.buscar("clinica san jose", 50);
+            List<Cliente> n = clientes.buscar("ÑANDÚ", 50);
+            comprobar(!r.isEmpty() && r.stream().allMatch(c -> c.nombreRazonSocial()
+                    .contains("CLÍNICA SAN JOSÉ")), "«clinica san jose»: " + r.size());
+            comprobar(n.isEmpty(), "«ÑANDÚ» no debía encontrar clientes");
+            return "«clinica san jose» encuentra " + r.size() + " clientes «CLÍNICA SAN JOSÉ»";
+        });
+
+        v.caso("F7 Busca productos sin tildes: «termometro» encuentra los termómetros", () -> {
+            List<ProductoServicio> r = productos.buscar("termometro", 20);
+            comprobar(r.size() >= 2 && r.stream().allMatch(p -> p.descripcion().contains("TERMÓMETRO")
+                    || p.descripcion().contains("TERMOMETRO")), r.size() + " resultados");
+            return r.size() + " productos o servicios";
+        });
+
         v.caso("F7 Busca productos por código y por descripción", () -> {
             List<ProductoServicio> porCodigo = productos.buscar("349", 10);
             List<ProductoServicio> porTexto = productos.buscar("termohigr", 10);

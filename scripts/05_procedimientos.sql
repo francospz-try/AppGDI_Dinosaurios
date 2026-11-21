@@ -47,22 +47,22 @@ DECLARE
 BEGIN
   SELECT eliminado INTO v_eliminado
     FROM cliente
-   WHERE tipo_documento = upper(btrim(p_tipo_documento))
+   WHERE tipo_documento = fn_mayusculas(btrim(p_tipo_documento))
      AND numero_documento = btrim(p_numero_documento);
   IF v_eliminado IS FALSE THEN
-    RAISE EXCEPTION 'Ya existe un cliente con % %.', upper(btrim(p_tipo_documento)),
+    RAISE EXCEPTION 'Ya existe un cliente con % %.', fn_mayusculas(btrim(p_tipo_documento)),
       btrim(p_numero_documento) USING ERRCODE = 'unique_violation';
   ELSIF v_eliminado IS TRUE THEN
     UPDATE cliente
-       SET nombre_razon_social = upper(fn_limpiar(p_nombre)),
-           direccion = upper(fn_limpiar(p_direccion)),
+       SET nombre_razon_social = fn_mayusculas(fn_limpiar(p_nombre)),
+           direccion = fn_mayusculas(fn_limpiar(p_direccion)),
            eliminado = FALSE
-     WHERE tipo_documento = upper(btrim(p_tipo_documento))
+     WHERE tipo_documento = fn_mayusculas(btrim(p_tipo_documento))
        AND numero_documento = btrim(p_numero_documento);
   ELSE
     INSERT INTO cliente (tipo_documento, numero_documento, nombre_razon_social, direccion)
-    VALUES (upper(btrim(p_tipo_documento)), btrim(p_numero_documento),
-            coalesce(upper(fn_limpiar(p_nombre)), ''), upper(fn_limpiar(p_direccion)));
+    VALUES (fn_mayusculas(btrim(p_tipo_documento)), btrim(p_numero_documento),
+            coalesce(fn_mayusculas(fn_limpiar(p_nombre)), ''), fn_mayusculas(fn_limpiar(p_direccion)));
   END IF;
 END;
 $$;
@@ -74,8 +74,8 @@ CREATE OR REPLACE PROCEDURE sp_modificar_cliente(
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE cliente
-     SET nombre_razon_social = coalesce(upper(fn_limpiar(p_nombre)), ''),
-         direccion = upper(fn_limpiar(p_direccion))
+     SET nombre_razon_social = coalesce(fn_mayusculas(fn_limpiar(p_nombre)), ''),
+         direccion = fn_mayusculas(fn_limpiar(p_direccion))
    WHERE tipo_documento = p_tipo_documento
      AND numero_documento = p_numero_documento
      AND NOT eliminado;
@@ -113,21 +113,21 @@ DECLARE
   v_eliminado boolean;
 BEGIN
   SELECT eliminado INTO v_eliminado FROM producto_servicio
-   WHERE codigo = upper(btrim(p_codigo));
+   WHERE codigo = fn_mayusculas(btrim(p_codigo));
   IF v_eliminado IS FALSE THEN
     RAISE EXCEPTION 'Ya existe un producto o servicio con el código %.',
-      upper(btrim(p_codigo)) USING ERRCODE = 'unique_violation';
+      fn_mayusculas(btrim(p_codigo)) USING ERRCODE = 'unique_violation';
   ELSIF v_eliminado IS TRUE THEN
     UPDATE producto_servicio
-       SET descripcion = coalesce(upper(fn_limpiar(p_descripcion)), ''),
-           unidad_medida = upper(btrim(p_unidad_medida)),
+       SET descripcion = coalesce(fn_mayusculas(fn_limpiar(p_descripcion)), ''),
+           unidad_medida = fn_mayusculas(btrim(p_unidad_medida)),
            eliminado = FALSE
-     WHERE codigo = upper(btrim(p_codigo));
+     WHERE codigo = fn_mayusculas(btrim(p_codigo));
   ELSE
     INSERT INTO producto_servicio (codigo, descripcion, unidad_medida)
-    VALUES (coalesce(upper(btrim(p_codigo)), ''),
-            coalesce(upper(fn_limpiar(p_descripcion)), ''),
-            upper(btrim(p_unidad_medida)));
+    VALUES (coalesce(fn_mayusculas(btrim(p_codigo)), ''),
+            coalesce(fn_mayusculas(fn_limpiar(p_descripcion)), ''),
+            fn_mayusculas(btrim(p_unidad_medida)));
   END IF;
 END;
 $$;
@@ -137,8 +137,8 @@ CREATE OR REPLACE PROCEDURE sp_modificar_producto(
 LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE producto_servicio
-     SET descripcion = coalesce(upper(fn_limpiar(p_descripcion)), ''),
-         unidad_medida = upper(btrim(p_unidad_medida))
+     SET descripcion = coalesce(fn_mayusculas(fn_limpiar(p_descripcion)), ''),
+         unidad_medida = fn_mayusculas(btrim(p_unidad_medida))
    WHERE codigo = p_codigo AND NOT eliminado;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'No existe un producto o servicio vigente con el código %.',
@@ -236,7 +236,7 @@ BEGIN
              importe_venta numeric)
   LOOP
     IF NOT EXISTS (SELECT 1 FROM producto_servicio p
-                    WHERE p.codigo = upper(btrim(r.codigo))) THEN
+                    WHERE p.codigo = fn_mayusculas(btrim(r.codigo))) THEN
       IF fn_limpiar(r.descripcion) IS NULL OR fn_limpiar(r.unidad_medida) IS NULL THEN
         RAISE EXCEPTION 'El producto o servicio % no existe: indique su descripción y unidad de medida.',
           r.codigo USING ERRCODE = 'foreign_key_violation';
@@ -244,11 +244,11 @@ BEGIN
       CALL sp_insertar_producto(r.codigo, r.descripcion, r.unidad_medida);
     ELSE
       UPDATE producto_servicio SET eliminado = FALSE
-       WHERE codigo = upper(btrim(r.codigo)) AND eliminado;
+       WHERE codigo = fn_mayusculas(btrim(r.codigo)) AND eliminado;
     END IF;
     INSERT INTO incluye (serie, numero, codigo, cantidad, valor_unitario,
                          precio_unitario, descuento, importe_venta)
-    VALUES (p_serie, p_numero, upper(btrim(r.codigo)), r.cantidad, r.valor_unitario,
+    VALUES (p_serie, p_numero, fn_mayusculas(btrim(r.codigo)), r.cantidad, r.valor_unitario,
             r.precio_unitario, coalesce(r.descuento, 0), r.importe_venta);
   END LOOP;
 
@@ -256,10 +256,10 @@ BEGIN
              AS x(tipo_relacionado text, numero_relacionado text)
   LOOP
     INSERT INTO documento_relacionado (tipo_relacionado, numero_relacionado)
-    VALUES (r.tipo_relacionado, upper(btrim(r.numero_relacionado)))
+    VALUES (r.tipo_relacionado, fn_mayusculas(btrim(r.numero_relacionado)))
     ON CONFLICT DO NOTHING;
     INSERT INTO referencia (serie, numero, tipo_relacionado, numero_relacionado)
-    VALUES (p_serie, p_numero, r.tipo_relacionado, upper(btrim(r.numero_relacionado)));
+    VALUES (p_serie, p_numero, r.tipo_relacionado, fn_mayusculas(btrim(r.numero_relacionado)));
   END LOOP;
 END;
 $$;
@@ -306,16 +306,16 @@ BEGIN
       -- innecesarias en cada comprobante del mismo cliente
       UPDATE cliente
          SET eliminado = FALSE,
-             nombre_razon_social = coalesce(upper(fn_limpiar(p_nombre_cliente)),
+             nombre_razon_social = coalesce(fn_mayusculas(fn_limpiar(p_nombre_cliente)),
                                             nombre_razon_social),
-             direccion = coalesce(upper(fn_limpiar(p_direccion_cliente)), direccion)
+             direccion = coalesce(fn_mayusculas(fn_limpiar(p_direccion_cliente)), direccion)
        WHERE tipo_documento = p_tipo_documento
          AND numero_documento = p_numero_documento
          AND (eliminado
               OR nombre_razon_social IS DISTINCT FROM
-                 coalesce(upper(fn_limpiar(p_nombre_cliente)), nombre_razon_social)
+                 coalesce(fn_mayusculas(fn_limpiar(p_nombre_cliente)), nombre_razon_social)
               OR direccion IS DISTINCT FROM
-                 coalesce(upper(fn_limpiar(p_direccion_cliente)), direccion));
+                 coalesce(fn_mayusculas(fn_limpiar(p_direccion_cliente)), direccion));
     END IF;
   END IF;
 
@@ -325,7 +325,7 @@ BEGIN
     otros_tributos, monto_redondeo, importe_total, percepcion,
     tipo_documento, numero_documento)
   VALUES (p_serie, p_numero, p_fecha_emision, p_fecha_vencimiento,
-    p_codigo_moneda, upper(fn_limpiar(p_forma_pago)), upper(fn_limpiar(p_medio_pago)),
+    p_codigo_moneda, fn_mayusculas(fn_limpiar(p_forma_pago)), fn_mayusculas(fn_limpiar(p_medio_pago)),
     fn_limpiar(p_observacion), p_op_gravada, coalesce(p_op_exonerada, 0),
     coalesce(p_op_inafecta, 0), p_op_gratuita, p_isc, p_igv, p_otros_cargos,
     p_otros_tributos, p_monto_redondeo, p_importe_total, p_percepcion,
@@ -373,8 +373,8 @@ BEGIN
 
   UPDATE comprobante
      SET fecha_emision = p_fecha_emision, fecha_vencimiento = p_fecha_vencimiento,
-         codigo_moneda = p_codigo_moneda, forma_pago = upper(fn_limpiar(p_forma_pago)),
-         medio_pago = upper(fn_limpiar(p_medio_pago)),
+         codigo_moneda = p_codigo_moneda, forma_pago = fn_mayusculas(fn_limpiar(p_forma_pago)),
+         medio_pago = fn_mayusculas(fn_limpiar(p_medio_pago)),
          observacion = fn_limpiar(p_observacion),
          op_gravada = p_op_gravada, op_exonerada = coalesce(p_op_exonerada, 0),
          op_inafecta = coalesce(p_op_inafecta, 0), op_gratuita = p_op_gratuita,
