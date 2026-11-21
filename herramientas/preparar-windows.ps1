@@ -33,8 +33,11 @@ foreach ($collection in $collections) {
     }
 }
 $app = Join-Path $Root 'AppGDI_Dinosaurios'
-if (-not (Test-Path (Join-Path $app 'config\database.properties'))) {
-    Copy-Item (Join-Path $app 'config\database.properties.example') (Join-Path $app 'config\database.properties')
+# La configuración es opcional: sin contraseña, el aplicativo la pide al abrirse.
+$config = Join-Path $app 'aplicativo\config\conexion.properties'
+if (-not (Test-Path $config)) {
+    Copy-Item (Join-Path $app 'aplicativo\config\conexion.example.properties') $config
 }
 Write-Host "Repositorios preparados en $Root. Habilidades estables enlazadas para Codex."
-Write-Host "Siguiente: configure PostgreSQL y ejecute $app\scripts\build.ps1"
+Write-Host "Siguiente: cree o migre la base según el README (base nueva o existente),"
+Write-Host "compile con $app\herramientas\compilar.ps1 y abra el aplicativo con $app\Iniciar.cmd"

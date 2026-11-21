@@ -67,7 +67,7 @@ public final class Configuracion {
      * propiedad del sistema {@value #PROPIEDAD_RUTA}.
      *
      * @return la configuración leída
-     * @throws ConfiguracionException si el archivo no existe o le falta un dato
+     * @throws ConfiguracionException si el archivo no existe o tiene un número no válido
      */
     public static Configuracion cargar() throws ConfiguracionException {
         String indicada = System.getProperty(PROPIEDAD_RUTA);
@@ -79,7 +79,7 @@ public final class Configuracion {
      *
      * @param ruta ruta del archivo
      * @return la configuración leída
-     * @throws ConfiguracionException si el archivo no existe o le falta un dato
+     * @throws ConfiguracionException si el archivo no existe o tiene un número no válido
      */
     public static Configuracion cargar(Path ruta) throws ConfiguracionException {
         if (!Files.isRegularFile(ruta)) {
@@ -95,32 +95,41 @@ public final class Configuracion {
             throw new ConfiguracionException("No se pudo leer " + ruta.toAbsolutePath()
                     + ": " + e.getMessage());
         }
+        // Cada dato se lee una sola vez; si falta o está en blanco, se usa el
+        // valor por defecto (el de porDefecto()), salvo la contraseña, que
+        // queda vacía y se pide en pantalla
+        Configuracion d = porDefecto();
         return new Configuracion(
-                obligatorio(p, "db.host"),
-                entero(p, "db.puerto"),
-                obligatorio(p, "db.base"),
-                p.getProperty("db.usuario", "gdi_app").isBlank() ? "gdi_app"
-                        : p.getProperty("db.usuario").trim(),
+                texto(p, "db.host", d.host()),
+                entero(p, "db.puerto", d.puerto(), 1, 65535),
+                texto(p, "db.base", d.base()),
+                texto(p, "db.usuario", d.usuario()),
                 p.getProperty("db.clave", ""),
-                p.containsKey("db.tiempoEspera") ? entero(p, "db.tiempoEspera") : 5);
+                entero(p, "db.tiempoEspera", d.tiempoEspera(), 1, 600));
     }
 
-    private static String obligatorio(Properties p, String clave) throws ConfiguracionException {
+    /** Texto recortado de una propiedad, o el valor por defecto si falta o está en blanco. */
+    private static String texto(Properties p, String clave, String porDefecto) {
         String valor = p.getProperty(clave);
-        if (valor == null || valor.isBlank()) {
-            throw new ConfiguracionException("Falta el dato «" + clave
-                    + "» en el archivo de configuración.");
-        }
-        return valor.trim();
+        return valor == null || valor.isBlank() ? porDefecto : valor.trim();
     }
 
-    private static int entero(Properties p, String clave) throws ConfiguracionException {
-        String valor = obligatorio(p, clave);
+    /** Entero de una propiedad dentro de un rango, o el valor por defecto si falta. */
+    private static int entero(Properties p, String clave, int porDefecto, int minimo, int maximo)
+            throws ConfiguracionException {
+        String valor = texto(p, clave, null);
+        if (valor == null) {
+            return porDefecto;
+        }
         try {
-            return Integer.parseInt(valor);
+            int n = Integer.parseInt(valor);
+            if (n < minimo || n > maximo) {
+                throw new NumberFormatException();
+            }
+            return n;
         } catch (NumberFormatException e) {
-            throw new ConfiguracionException("El dato «" + clave + "» debe ser un número entero: "
-                    + valor);
+            throw new ConfiguracionException("El dato «" + clave + "» debe ser un número entero"
+                    + " entre " + minimo + " y " + maximo + ": " + valor);
         }
     }
 
