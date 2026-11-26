@@ -24,34 +24,32 @@ y de interfaz de la versión anterior de este repositorio.
 
 ## Instaladores para Windows y Linux
 
-Descargue el instalador de [GitHub Releases](https://github.com/francospz-try/AppGDI_Dinosaurios/releases).
-Ambas versiones son para equipos x86-64 e incluyen las imágenes de la
-aplicación y PostgreSQL 17. No se requiere Java ni PostgreSQL en el sistema
-anfitrión.
+Descargue el instalador x86-64 de [GitHub Releases](https://github.com/francospz-try/AppGDI_Dinosaurios/releases).
+Desde la versión 1.1, ambas variantes incluyen PostgreSQL 17 y el runtime Java 21.
+Se instalan por usuario y abren Swing como una aplicación de escritorio, sin Docker
+ni navegador.
 
-- **Windows 10/11 de 64 bits:** ejecute `AppGDI-Dinosaurios-Windows-x64.exe`.
-  El acceso directo de AppGDI instala Docker Desktop mediante `winget` si
-  falta. Docker Desktop puede solicitar permisos, la activación de WSL 2 o un
-  reinicio. Vuelva a abrir el acceso directo después del reinicio.
-- **Linux x86-64:** ejecute `bash AppGDI-Dinosaurios-Linux-x64.run`.
-  En Ubuntu 24.04 se instala Docker Engine y Compose v2 mediante APT si faltan.
-  En otras distribuciones se requiere Docker Engine y Compose v2 instalados.
-  Ejecute el archivo como usuario normal. El lanzador pedirá `sudo` si necesita
-  instalar Docker o acceder a su servicio.
+| Variante | Comportamiento |
+|---|---|
+| **Headless** | Arranca un servidor PostgreSQL privado en segundo plano y lo conserva activo cuando se cierra AppGDI. |
+| **Embebido** | AppGDI arranca su propio proceso PostgreSQL y lo detiene al cerrar. Usa el mismo motor y esquema que la otra variante. |
 
-En el primer arranque se generan dos contraseñas aleatorias e independientes.
-El lanzador permite reemplazar la de `gdi_app` antes de inicializar PostgreSQL.
-Guarda ambas en `%LOCALAPPDATA%\AppGDI-Dinosaurios\config.ini` en Windows o
-en `$XDG_CONFIG_HOME/AppGDI-Dinosaurios/config.ini` en Linux
-(`~/.config/AppGDI-Dinosaurios/config.ini` por defecto, con permisos 0600).
-Los datos quedan en el volumen Docker `appgdi-dinosaurios_datos` y se conservan
-al reiniciar o actualizar. Conserve el archivo de configuración junto con sus
-respaldos. Editarlo después del primer arranque no cambia la clave de PostgreSQL.
+- En Windows x64, ejecute el `.exe` y abra el acceso directo de la variante instalada.
+  La variante Headless incluye un acceso directo para detener su servidor.
+- En Linux x86-64 con glibc y escritorio gráfico, ejecute `bash AppGDI-Dinosaurios-Headless-Linux-x64.run`
+  o `bash AppGDI-Dinosaurios-Embebido-Linux-x64.run`. El mismo archivo sirve para
+  volver a abrir la aplicación. Para detener el servidor Headless, agregue `--detener`.
 
-La ventana Swing se abre en el navegador mediante noVNC en `127.0.0.1`.
-La base solo es accesible dentro de la red de Docker. Para volver a abrir la
-aplicación use el mismo lanzador. La primera instalación de Docker requiere
-internet.
+En el primer arranque se generan dos contraseñas aleatorias. Puede cambiar la de
+`gdi_app` antes de crear la base. Cada variante escribe su propio `config.ini` en
+`%LOCALAPPDATA%\AppGDI-Dinosaurios\headless` o `embebido` en Windows. En Linux
+usa `$XDG_DATA_HOME/AppGDI-Dinosaurios/headless` o `embebido`, con
+`~/.local/share` como ruta base predeterminada.
+
+PostgreSQL escucha en `127.0.0.1` y guarda los datos junto al archivo de
+configuración. Cada variante inicia con sus propios datos de demostración. Las
+instalaciones existentes de [la versión Docker v1.0.3](https://github.com/francospz-try/AppGDI_Dinosaurios/releases/tag/v1.0.3)
+conservan su volumen. Los instaladores nativos no importan ese volumen.
 
 ## Inicio rápido
 
