@@ -15,7 +15,7 @@ done
 xdpyinfo >/dev/null
 openbox &
 x11vnc -display "$DISPLAY" -localhost -rfbport 5900 -forever -shared -nopw -quiet &
-websockify --web /usr/share/novnc 0.0.0.0:6080 localhost:5900 &
+PYTHONPATH=/opt/appgdi websockify --auth-plugin origen_novnc.OrigenLocal --web /usr/share/novnc 0.0.0.0:6080 localhost:5900 &
 java -Dcomprobantes.config="$config" -jar /opt/appgdi/app.jar &
 trap 'exit 0' TERM INT
 trap 'kill $(jobs -pr) 2>/dev/null || true; unlink "$config"; unlink "$XAUTHORITY"' EXIT

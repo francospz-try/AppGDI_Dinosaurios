@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: instaladores-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contenedores:
     runs-on: ubuntu-24.04
@@ -52,7 +56,26 @@ jobs:
           test "$suma" = "$(sha256sum "$config")"
 
           compose=(docker compose --env-file "$config" -f paquete/compose.yaml)
-          curl -fsS "http://$("${compose[@]}" port app 6080)/vnc.html" -o /dev/null
+          address=$("${compose[@]}" port app 6080)
+          curl -fsS "http://$address/vnc.html" -o /dev/null
+          python3 - "$address" <<'PYTHON'
+          import http.client
+          import sys
+
+          address = sys.argv[1]
+          for origin, expected in ((f"http://{address}", 101), ("https://example.org", 403)):
+              connection = http.client.HTTPConnection(address, timeout=5)
+              connection.request("GET", "/websockify", headers={
+                  "Origin": origin,
+                  "Connection": "Upgrade",
+                  "Upgrade": "websocket",
+                  "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
+                  "Sec-WebSocket-Version": "13",
+              })
+              response = connection.getresponse()
+              assert response.status == expected, (origin, response.status)
+              connection.close()
+          PYTHON
           "${compose[@]}" exec -T app bash -euc '
             config=$(mktemp)
             printf "db.host=db\ndb.usuario=gdi_app\ndb.clave=%s\n" "$GDI_APP_PASSWORD" > "$config"
