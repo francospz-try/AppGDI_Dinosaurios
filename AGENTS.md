@@ -1,15 +1,28 @@
 # Desarrollo del aplicativo GDI
 
-Leer README.md, GLOSSARY.md y docs/requisitos.md antes de cambiar comportamiento.
-Java 21, Swing y JDBC directo; sin ORM ni frameworks de aplicación.
-Todas las consultas y escrituras funcionales deben ejecutar procedimientos PostgreSQL.
-Usar BigDecimal para importes. Conservar NULL y claves compuestas del modelo.
-Mantener operaciones de base fuera del hilo de eventos Swing.
-No incorporar datos personales, DNI escaneados, firmas, credenciales ni documentos
-de autorización al repositorio público.
-Ejecutar scripts/test.sh para las pruebas de integración; requiere base de prueba
-configurada. Los scripts originales de creación son destructivos: nunca ejecutarlos
-automáticamente al abrir el aplicativo.
-Aplicar Superpowers (planificación y verificación) y Matt Pocock (diseño de módulos
-y vocabulario del dominio) cuando estén disponibles. No confundir clonar un paquete
-de habilidades con instalarlo en el equipo Windows del usuario.
+Leer README.md, GLOSSARY.md, docs/requisitos.md y aplicativo/README.md antes de
+cambiar comportamiento. Java 21, Swing y JDBC directo; sin ORM ni frameworks de
+aplicación.
+
+- Toda escritura del aplicativo pasa por un procedimiento (`CALL sp_...`); las
+  lecturas, por funciones (`SELECT * FROM fn_...`). El rol `gdi_app` no tiene
+  permisos sobre las tablas para otra cosa que leer.
+- Usar BigDecimal para importes. Conservar NULL y claves compuestas del modelo.
+- Mantener las operaciones de base fuera del hilo de eventos de Swing (`Tarea`).
+- Al cambiar un script numerado, regenerar el completo con
+  `sh scripts/generar_completo.sh`; si se vuelven a crear las rutinas, ejecutar
+  otra vez `08_permisos.sql`.
+- Probar con `herramientas/probar.sh` sobre una base descartable recién creada.
+  El script completo es destructivo: nunca ejecutarlo al abrir el aplicativo ni
+  sobre una base en uso; para una base de la versión anterior, usar
+  `scripts/migrar_desde_version_anterior.sql`.
+- No usar `upper()`, `lower()` ni `ILIKE` sobre texto del usuario: usar
+  `fn_mayusculas` y `fn_clave_busqueda`, que no dependen de la configuración
+  regional de la instancia.
+- En los scripts de `herramientas/`, calcular las rutas desde la ubicación del
+  propio script y no dejar cambiada la carpeta de trabajo.
+- No incorporar datos personales, DNI escaneados, firmas, credenciales ni
+  documentos de autorización al repositorio público.
+- Aplicar Superpowers (planificación y verificación) y Matt Pocock (diseño de
+  módulos y vocabulario del dominio) cuando estén disponibles. No confundir
+  clonar un paquete de habilidades con instalarlo en el equipo del usuario.

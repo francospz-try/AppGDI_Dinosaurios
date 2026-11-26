@@ -1,0 +1,6 @@
+# Compilación de Maven
+target/
+# Configuración real con credenciales: no se versiona (ver config/conexion.example.properties)
+config/conexion.properties
+# Controlador JDBC descargado por herramientas/compilar.*
+lib/

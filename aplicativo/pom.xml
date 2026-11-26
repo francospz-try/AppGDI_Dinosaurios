@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Aplicativo de registro de comprobantes de pago de Sermed Ingenieros E.I.R.L.
+  Maven solo compila y empaqueta: el aplicativo no usa frameworks. Su única
+  dependencia es el controlador JDBC oficial de PostgreSQL.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>sermed</groupId>
+  <artifactId>registro-comprobantes</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>Registro de comprobantes de pago</name>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <clase.principal>sermed.comprobantes.App</clase.principal>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.7.7</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Genera además un .jar ejecutable que incluye el controlador JDBC -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.7.1</version>
+        <configuration>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
+          <archive>
+            <manifest>
+              <mainClass>${clase.principal}</mainClass>
+            </manifest>
+          </archive>
+          <finalName>registro-comprobantes</finalName>
+          <appendAssemblyId>false</appendAssemblyId>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,5 +1,9 @@
 # Primer incremento del cliente GDI
 
+> Documento histórico de la versión anterior del aplicativo (paquete
+> `pe.edu.ucsm.gdi`, scripts `database/04`–`07`), reemplazada en el PR #1. Las
+> clases y rutas que menciona ya no existen; ver `README.md`.
+
 ## Intención y alcance
 Hacer demostrable la conexión de una interfaz de escritorio a la BD existente.
 El encargado consulta comprobantes, abre cabecera/detalle/referencias, mantiene

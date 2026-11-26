@@ -1,5 +1,9 @@
 # Primer incremento GDI Implementation Plan
 
+> Documento histórico de la versión anterior del aplicativo (paquete
+> `pe.edu.ucsm.gdi`, scripts `database/04`–`07`), reemplazada en el PR #1. Las
+> clases y rutas que menciona ya no existen; ver `README.md`.
+
 **Goal:** conexión y consulta funcional de la BD de Sermed desde escritorio.
 **Architecture:** configuración externa, procedimientos, repositorio JDBC, Swing.
 **Tech Stack:** Java 21, PostgreSQL 17+, pgJDBC, sin frameworks.
