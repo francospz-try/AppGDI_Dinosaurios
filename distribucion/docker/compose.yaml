@@ -1,0 +1,32 @@
+name: appgdi-dinosaurios
+services:
+  db:
+    image: appgdi-dinosaurios-db:__VERSION__
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta la clave de administrador}
+      GDI_APP_PASSWORD: ${GDI_APP_PASSWORD:?Falta la clave de gdi_app}
+    volumes:
+      - datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$$GDI_APP_PASSWORD\" psql -X -h 127.0.0.1 -U gdi_app -d registro_comprobantes -Atqc 'SELECT 1'"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+  app:
+    image: appgdi-dinosaurios-app:__VERSION__
+    init: true
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket, urllib.request; urllib.request.urlopen('http://localhost:6080/vnc.html', timeout=2).close(); socket.create_connection(('127.0.0.1', 5900), timeout=2).close()"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    environment:
+      GDI_APP_PASSWORD: ${GDI_APP_PASSWORD:?Falta la clave de gdi_app}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1::6080"
+volumes:
+  datos:

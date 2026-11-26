@@ -1,0 +1,155 @@
+name: Publicar instaladores
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/releases.yml'
+      - '.dockerignore'
+      - 'distribucion/**'
+      - 'aplicativo/src/**'
+      - 'herramientas/compilar.sh'
+      - 'scripts/registro_comprobantes_completo.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contenedores:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: echo "value=1.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+      - name: Construir imágenes e instalador Linux
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          docker build -f distribucion/docker/Dockerfile.app -t "appgdi-dinosaurios-app:$VERSION" .
+          docker build -f distribucion/docker/Dockerfile.db -t "appgdi-dinosaurios-db:$VERSION" .
+          mkdir paquete salida
+          sed "s/__VERSION__/$VERSION/g" distribucion/docker/compose.yaml > paquete/compose.yaml
+          printf '%s\n' "$VERSION" > paquete/version.txt
+          cp distribucion/linux/iniciar.sh paquete/
+          docker save "appgdi-dinosaurios-app:$VERSION" "appgdi-dinosaurios-db:$VERSION" | gzip -1 > paquete/imagenes.tar.gz
+          bash distribucion/linux/empaquetar.sh paquete salida/AppGDI-Dinosaurios-Linux-x64.run
+      - name: Verificar primera ejecución, aplicación y persistencia
+        run: |
+          set -euo pipefail
+          export XDG_CONFIG_HOME="$RUNNER_TEMP/appgdi-test"
+          export DISPLAY= WAYLAND_DISPLAY=
+          printf 's\nClaveCI-para-validacion-01\nClaveCI-para-validacion-01\n' | bash salida/AppGDI-Dinosaurios-Linux-x64.run
+          config="$XDG_CONFIG_HOME/AppGDI-Dinosaurios/config.ini"
+          test "$(stat -c '%a' "$config")" = 600
+          test "$(rg -c '^POSTGRES_PASSWORD=[0-9a-f]{64}$' "$config")" = 1
+          rg -q '^GDI_APP_PASSWORD=ClaveCI-para-validacion-01$' "$config"
+          suma=$(sha256sum "$config")
+          bash salida/AppGDI-Dinosaurios-Linux-x64.run </dev/null
+          test "$suma" = "$(sha256sum "$config")"
+
+          compose=(docker compose --env-file "$config" -f paquete/compose.yaml)
+          curl -fsS "http://$("${compose[@]}" port app 6080)/vnc.html" -o /dev/null
+          "${compose[@]}" exec -T app bash -euc '
+            config=$(mktemp)
+            printf "db.host=db\ndb.usuario=gdi_app\ndb.clave=%s\n" "$GDI_APP_PASSWORD" > "$config"
+            java -cp app.jar sermed.comprobantes.pruebas.PruebaConfiguracion
+            for prueba in PruebaConexion PruebasHito30 PruebasHito70 PruebasHito100 PruebaInterfaz; do
+              java -Dcomprobantes.config="$config" -cp app.jar "sermed.comprobantes.pruebas.$prueba"
+            done
+          '
+          sed -n 's/^POSTGRES_PASSWORD=//p' "$config" | "${compose[@]}" exec -T app bash -euc '
+            admin=$(mktemp)
+            read -r password
+            printf "db.host=db\ndb.usuario=postgres\ndb.clave=%s\n" "$password" > "$admin"
+            java -cp app.jar sermed.comprobantes.pruebas.PruebaIntegridad "$admin"
+          '
+          "${compose[@]}" down -v
+          mv "$config" "$config.personalizado"
+          printf '\n' | bash salida/AppGDI-Dinosaurios-Linux-x64.run
+          rg -q '^GDI_APP_PASSWORD=[0-9a-f]{64}$' "$config"
+          test "$(cut -d= -f2 "$config" | sort -u | wc -l)" = 2
+          "${compose[@]}" down -v
+      - name: Mostrar registros si falla la verificación
+        if: failure()
+        run: docker ps -a --filter label=com.docker.compose.project=appgdi-dinosaurios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: salida/AppGDI-Dinosaurios-Linux-x64.run
+          if-no-files-found: error
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paquete
+          path: |
+            paquete/compose.yaml
+            paquete/version.txt
+            paquete/imagenes.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+
+  windows:
+    needs: contenedores
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: paquete
+          path: distribucion/windows/paquete
+      - name: Compilar instalador Windows
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.contenedores.outputs.version }}
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path distribucion/windows/iniciar.ps1).Path, [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) { throw ($errors | Out-String) }
+          Copy-Item distribucion/windows/iniciar.cmd,distribucion/windows/iniciar.ps1 distribucion/windows/paquete
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+              choco install innosetup -y --no-progress
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          & $compiler "/DVersion=$env:VERSION" distribucion/windows/instalador.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: distribucion/windows/salida/AppGDI-Dinosaurios-Windows-x64.exe
+          if-no-files-found: error
+          compression-level: 0
+
+  publicar:
+    if: github.ref == 'refs/heads/main'
+    needs: [contenedores, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux
+          path: salida
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: salida
+      - name: Publicar en GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.contenedores.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd salida
+          sha256sum AppGDI-Dinosaurios-* > SHA256SUMS.txt
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "AppGDI Dinosaurios $VERSION" --generate-notes \
+            AppGDI-Dinosaurios-Linux-x64.run AppGDI-Dinosaurios-Windows-x64.exe SHA256SUMS.txt

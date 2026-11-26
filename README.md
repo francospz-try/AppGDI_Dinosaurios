@@ -22,6 +22,37 @@ y de interfaz de la versión anterior de este repositorio.
 | `Iniciar.cmd` | Abre el aplicativo desde esta carpeta, en Windows |
 | `docs/` | Memoria descriptiva, manual de usuario, requisitos y verificación |
 
+## Instaladores para Windows y Linux
+
+Descargue el instalador de [GitHub Releases](https://github.com/francospz-try/AppGDI_Dinosaurios/releases).
+Ambas versiones son para equipos x86-64 e incluyen las imágenes de la
+aplicación y PostgreSQL 17. No se requiere Java ni PostgreSQL en el sistema
+anfitrión.
+
+- **Windows 10/11 de 64 bits:** ejecute `AppGDI-Dinosaurios-Windows-x64.exe`.
+  El acceso directo de AppGDI instala Docker Desktop mediante `winget` si
+  falta. Docker Desktop puede solicitar permisos, la activación de WSL 2 o un
+  reinicio. Vuelva a abrir el acceso directo después del reinicio.
+- **Linux x86-64:** ejecute `bash AppGDI-Dinosaurios-Linux-x64.run`.
+  En Ubuntu 24.04 se instala Docker Engine y Compose v2 mediante APT si faltan.
+  En otras distribuciones se requiere Docker Engine y Compose v2 instalados.
+  Ejecute el archivo como usuario normal. El lanzador pedirá `sudo` si necesita
+  instalar Docker o acceder a su servicio.
+
+En el primer arranque se generan dos contraseñas aleatorias e independientes.
+El lanzador permite reemplazar la de `gdi_app` antes de inicializar PostgreSQL.
+Guarda ambas en `%LOCALAPPDATA%\AppGDI-Dinosaurios\config.ini` en Windows o
+en `$XDG_CONFIG_HOME/AppGDI-Dinosaurios/config.ini` en Linux
+(`~/.config/AppGDI-Dinosaurios/config.ini` por defecto, con permisos 0600).
+Los datos quedan en el volumen Docker `appgdi-dinosaurios_datos` y se conservan
+al reiniciar o actualizar. Conserve el archivo de configuración junto con sus
+respaldos. Editarlo después del primer arranque no cambia la clave de PostgreSQL.
+
+La ventana Swing se abre en el navegador mediante noVNC en `127.0.0.1`.
+La base solo es accesible dentro de la red de Docker. Para volver a abrir la
+aplicación use el mismo lanzador. La primera instalación de Docker requiere
+internet.
+
 ## Inicio rápido
 
 Requisitos: PostgreSQL 17 con `psql` y un JDK 21 completo (`java`, `javac`,

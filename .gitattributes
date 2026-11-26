@@ -9,3 +9,6 @@
 *.bat text eol=crlf
 *.pdf binary
 *.png binary
+Dockerfile.* text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

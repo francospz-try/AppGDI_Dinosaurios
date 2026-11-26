@@ -1,0 +1,11 @@
+**
+!herramientas
+!herramientas/compilar.sh
+!aplicativo
+!aplicativo/src
+!aplicativo/src/**
+!scripts
+!scripts/registro_comprobantes_completo.sql
+!distribucion
+!distribucion/docker
+!distribucion/docker/**
