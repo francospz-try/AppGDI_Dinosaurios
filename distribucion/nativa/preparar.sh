@@ -9,6 +9,9 @@ case "$sistema" in
   *) exit 2 ;;
 esac
 repo=$(cd "$(dirname "$0")/../.." && pwd)
+if [[ "$sistema" == windows ]]; then
+  RUNNER_TEMP=$(cygpath -u "$RUNNER_TEMP")
+fi
 mkdir -p "$salida/postgresql"
 salida=$(cd "$salida" && pwd)
 descarga=$(mktemp -d "${RUNNER_TEMP:-$salida}/appgdi-postgresql.XXXXXX")
@@ -20,7 +23,13 @@ printf '%s  %s\n' "$sha" "$descarga/postgresql.jar" | sha256sum -c -
   cd "$descarga"
   jar xf postgresql.jar "postgres-$sistema-x86_64.txz"
 )
-tar -xJf "$descarga/postgres-$sistema-x86_64.txz" -C "$salida/postgresql"
+archivo="$descarga/postgres-$sistema-x86_64.txz"
+if [[ "$sistema" == windows ]]; then
+  sistema_windows=$(cygpath -u "${SYSTEMROOT:-${SystemRoot:-C:/Windows}}")
+  "$sistema_windows/System32/tar.exe" -xf "$(cygpath -w "$archivo")" -C "$(cygpath -w "$salida/postgresql")"
+else
+  tar -xJf "$archivo" -C "$salida/postgresql"
+fi
 cp "$repo/distribucion/nativa/PostgreSQL-COPYRIGHT.txt" "$salida/postgresql/COPYRIGHT"
 cp "$repo/distribucion/nativa/Zonky-LICENSE.txt" "$salida/postgresql/Zonky-LICENSE"
 cp "$repo/scripts/registro_comprobantes_completo.sql" "$salida/base.sql"
