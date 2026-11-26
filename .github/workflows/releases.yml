@@ -41,6 +41,7 @@ jobs:
           cp distribucion/linux/iniciar.sh paquete/
           docker save "appgdi-dinosaurios-app:$VERSION" "appgdi-dinosaurios-db:$VERSION" | gzip -1 > paquete/imagenes.tar.gz
           bash distribucion/linux/empaquetar.sh paquete salida/AppGDI-Dinosaurios-Linux-x64.run
+          docker image rm "appgdi-dinosaurios-app:$VERSION" "appgdi-dinosaurios-db:$VERSION"
       - name: Verificar primera ejecución, aplicación y persistencia
         run: |
           set -euo pipefail
@@ -49,8 +50,8 @@ jobs:
           printf 's\nClaveCI-para-validacion-01\nClaveCI-para-validacion-01\n' | bash salida/AppGDI-Dinosaurios-Linux-x64.run
           config="$XDG_CONFIG_HOME/AppGDI-Dinosaurios/config.ini"
           test "$(stat -c '%a' "$config")" = 600
-          test "$(rg -c '^POSTGRES_PASSWORD=[0-9a-f]{64}$' "$config")" = 1
-          rg -q '^GDI_APP_PASSWORD=ClaveCI-para-validacion-01$' "$config"
+          test "$(grep -Ec '^POSTGRES_PASSWORD=[0-9a-f]{64}$' "$config")" = 1
+          grep -Eq '^GDI_APP_PASSWORD=ClaveCI-para-validacion-01$' "$config"
           suma=$(sha256sum "$config")
           bash salida/AppGDI-Dinosaurios-Linux-x64.run </dev/null
           test "$suma" = "$(sha256sum "$config")"
@@ -93,12 +94,16 @@ jobs:
           "${compose[@]}" down -v
           mv "$config" "$config.personalizado"
           printf '\n' | bash salida/AppGDI-Dinosaurios-Linux-x64.run
-          rg -q '^GDI_APP_PASSWORD=[0-9a-f]{64}$' "$config"
+          grep -Eq '^GDI_APP_PASSWORD=[0-9a-f]{64}$' "$config"
           test "$(cut -d= -f2 "$config" | sort -u | wc -l)" = 2
           "${compose[@]}" down -v
       - name: Mostrar registros si falla la verificación
         if: failure()
-        run: docker ps -a --filter label=com.docker.compose.project=appgdi-dinosaurios
+        run: |
+          docker ps -a --filter label=com.docker.compose.project=appgdi-dinosaurios
+          for id in $(docker ps -aq --filter label=com.docker.compose.project=appgdi-dinosaurios); do
+            docker logs --tail 30 "$id"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: linux
