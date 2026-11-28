@@ -84,3 +84,23 @@ La implementación anterior de este repositorio (paquete `pe.edu.ucsm.gdi` y
 scripts `database/04`–`07`, ya retirados) se construyó y probó en las mismas
 condiciones antes de integrarla: 79 de 79 comprobaciones. Queda en el historial
 de Git.
+
+## Ejecutable con PostgreSQL embebido
+
+Fecha: 28 de noviembre de 2026, sobre `main` en `f620113` más las correcciones de
+la rama `revisar-ejecutable-embebido`. Motor: binarios de PostgreSQL 17.12 de
+Zonky (los mismos de EDB), cargados con el script completo sin cambios.
+
+| Prueba | Resultado |
+|---|---|
+| `--verificar` en Linux, con datos en `…/José Ñúñez/`, el puerto 5432 ocupado y `PGPORT`, `PGDATA`, `PGHOST`, `PGOPTIONS` con valores falsos | 101 de 101 |
+| `--verificar` en Windows (wine 11.22) desde el instalador Inno Setup 6.7.4 instalado en `C:\Instalación José\AppGDI Embebido`, con datos en `C:\Temp Ñandú` | 101 de 101; sin la corrección de `initdb`, falla al crear el clúster |
+| Ciclo de vida en Linux y en Windows (wine, perfil `C:\users\José`) con una ventana sustituta: primera ejecución, segunda (conserva los datos), segunda instancia (rechazada), cierre brusco de Java (el siguiente arranque detiene el servidor huérfano), `postmaster.pid` vencido con un PID reutilizado, `--detener`, respaldo y restauración | Todo correcto; sin procesos ni bloqueos al terminar |
+| Variante Headless: el servidor sigue tras cerrar, el siguiente arranque lo reutiliza y `--detener` lo para | Correcto |
+| Firma con `firmar.sh` y un certificado autofirmado de prueba | Firma Authenticode con sello de tiempo de DigiCert; el instalador firmado se instala |
+
+Tamaños medidos: instalador 58,7 MB; programa instalado 186 MB en Windows y
+146 MB en Linux; clúster recién cargado 67 MB (34 MB de datos y 32 MB de WAL);
+respaldo `.zip` 8,7 MB.
+
+Pendiente de probar en un Windows real: ver `docs/pruebas_windows.md`.
