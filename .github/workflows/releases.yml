@@ -37,7 +37,10 @@ jobs:
           for modo in headless embebido; do
             archivo="salida/AppGDI-Dinosaurios-${modo^}-Linux-x64.run"
             bash distribucion/nativa/empaquetar-linux.sh paquete "$version" "$modo" "$archivo"
-            XDG_DATA_HOME="$RUNNER_TEMP/datos-$modo" bash "$archivo" --verificar "$RUNNER_TEMP"
+            # Rutas con espacios y tildes, como /home/José o C:\Users\José.
+            pruebas="$RUNNER_TEMP/Prueba José $modo"
+            mkdir -p "$pruebas"
+            XDG_DATA_HOME="$RUNNER_TEMP/Datos José $modo" bash "$archivo" --verificar "$pruebas"
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -75,14 +78,18 @@ jobs:
               & $compiler "/DVersion=$version" "/DVariante=$variant" distribucion/nativa/instalador.iss
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
               $installer = Resolve-Path "distribucion/nativa/salida/AppGDI-Dinosaurios-$variant-Windows-x64.exe"
-              $installed = Join-Path $env:RUNNER_TEMP "AppGDI $variant"
+              # Carpeta con espacios y tildes: el instalador por defecto usa
+              # %LOCALAPPDATA%\Programs, que incluye el nombre del usuario (C:\Users\José).
+              $installed = Join-Path $env:RUNNER_TEMP "AppGDI José $variant"
+              $pruebas = Join-Path $env:RUNNER_TEMP "Prueba Ñandú $variant"
+              New-Item -ItemType Directory -Force $pruebas | Out-Null
               $result = Start-Process -FilePath $installer.Path -Wait -PassThru -ArgumentList @(
                   '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', ('/DIR="{0}"' -f $installed))
               if ($result.ExitCode -ne 0) { throw "El instalador devolvió $($result.ExitCode)." }
-              & "$installed\java\bin\java.exe" '-Djava.awt.headless=true' -cp "$installed\inicio.jar;$installed\app.jar" sermed.comprobantes.distribucion.InicioNativo $installed --verificar $env:RUNNER_TEMP
+              & "$installed\java\bin\java.exe" '-Djava.awt.headless=true' -cp "$installed\inicio.jar;$installed\app.jar" sermed.comprobantes.distribucion.InicioNativo $installed --verificar $pruebas
               if ($LASTEXITCODE -ne 0) {
                   $code = $LASTEXITCODE
-                  Get-ChildItem "$env:RUNNER_TEMP\appgdi-prueba-*\*.log" | Get-Content -Tail 20
+                  Get-ChildItem "$pruebas\appgdi-prueba-*\*.log" | Get-Content -Tail 20
                   exit $code
               }
           }
@@ -108,6 +115,35 @@ jobs:
         with:
           name: windows
           path: salida
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+          sparse-checkout: distribucion/nativa/firmar.sh
+          sparse-checkout-cone-mode: false
+      - name: Firmar los instaladores de Windows (solo si hay certificado)
+        env:
+          # Certificado .p12/.pfx en base64, o un servicio en la nube (FIRMA_TIPO y
+          # FIRMA_ALMACEN como variables del repositorio). Sin ellos se publica sin firmar.
+          FIRMA_PFX_BASE64: ${{ secrets.FIRMA_PFX_BASE64 }}
+          FIRMA_CLAVE: ${{ secrets.FIRMA_CLAVE }}
+          FIRMA_TIPO: ${{ vars.FIRMA_TIPO }}
+          FIRMA_ALMACEN: ${{ vars.FIRMA_ALMACEN }}
+          FIRMA_ALIAS: ${{ vars.FIRMA_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${FIRMA_PFX_BASE64}${FIRMA_ALMACEN}" ]]; then
+            echo "::notice::Sin certificado configurado: los instaladores se publican sin firmar."
+            exit 0
+          fi
+          if [[ -n "$FIRMA_PFX_BASE64" ]]; then
+            umask 077
+            printf '%s' "$FIRMA_PFX_BASE64" | base64 -d > "$RUNNER_TEMP/firma.p12"
+            export FIRMA_ALMACEN="$RUNNER_TEMP/firma.p12"
+          fi
+          [[ -n "$FIRMA_TIPO" ]] || unset FIRMA_TIPO
+          [[ -n "$FIRMA_ALIAS" ]] || unset FIRMA_ALIAS
+          bash repo/distribucion/nativa/firmar.sh salida/*.exe
+          rm -f "$RUNNER_TEMP/firma.p12"
       - name: Publicar en GitHub Releases
         env:
           GH_TOKEN: ${{ github.token }}
