@@ -14,7 +14,7 @@
 AppId=AppGDI-Dinosaurios-{#Variante}
 AppName=AppGDI Dinosaurios ({#Variante})
 AppVersion={#Version}
-AppPublisher=Grupo Dinosaurios - UCSM
+AppPublisher=Grupo 9, Gestion de Datos e Informacion - UCSM
 DefaultDirName={localappdata}\Programs\AppGDI-Dinosaurios-{#Variante}
 DefaultGroupName=AppGDI Dinosaurios ({#Variante})
 DisableProgramGroupPage=yes
