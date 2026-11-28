@@ -93,10 +93,19 @@ jobs:
                   exit $code
               }
           }
+      - name: Empaquetar la carpeta portátil de Windows (variante Embebido)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-Content -Encoding ascii distribucion/nativa/paquete/modo.txt embebido
+          $destino = 'distribucion/nativa/salida/AppGDI-Dinosaurios-Embebido-Windows-x64-portable.zip'
+          Compress-Archive -Path distribucion/nativa/paquete/* -DestinationPath $destino -CompressionLevel Optimal
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: distribucion/nativa/salida/*.exe
+          path: |
+            distribucion/nativa/salida/*.exe
+            distribucion/nativa/salida/*.zip
           if-no-files-found: error
           compression-level: 0
 
@@ -154,5 +163,5 @@ jobs:
           sha256sum AppGDI-Dinosaurios-* > SHA256SUMS.txt
           gh release create "v$version" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "AppGDI Dinosaurios $version · PostgreSQL nativo" \
-            --notes "Cuatro instaladores x64 para Linux y Windows. Headless mantiene PostgreSQL en segundo plano. Embebido inicia y detiene la instancia con AppGDI. Ambos incluyen Java y PostgreSQL 17, usan datos separados y no requieren Docker." \
+            --notes "Cuatro instaladores x64 para Linux y Windows y una carpeta portátil para Windows. Headless mantiene PostgreSQL en segundo plano. Embebido inicia y detiene la instancia con AppGDI. Ambos incluyen Java y PostgreSQL 17, usan datos separados y no requieren Docker." \
             AppGDI-Dinosaurios-* SHA256SUMS.txt

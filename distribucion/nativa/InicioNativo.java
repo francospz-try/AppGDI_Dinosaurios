@@ -37,8 +37,10 @@ import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPasswordField;
+import javax.swing.JTextArea;
 import javax.swing.JWindow;
 import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import org.postgresql.core.Parser;
@@ -112,8 +114,8 @@ public final class InicioNativo {
             error.printStackTrace();
             if (!verificar && !GraphicsEnvironment.isHeadless()) {
                 JOptionPane.showMessageDialog(null,
-                        "No se pudo completar la operación de AppGDI. " + error.getMessage()
-                                + "\nRegistro: " + carpeta.resolve("arranque.log"),
+                        envolver("No se pudo completar la operación de AppGDI. " + error.getMessage()
+                                + "\nRegistro: " + carpeta.resolve("arranque.log")),
                         "AppGDI Dinosaurios", JOptionPane.ERROR_MESSAGE);
             }
             System.exit(1);
@@ -519,8 +521,23 @@ public final class InicioNativo {
     private void informar(String mensaje) {
         System.out.println(mensaje);
         if (!verificar && !GraphicsEnvironment.isHeadless()) {
-            JOptionPane.showMessageDialog(null, mensaje, "AppGDI Dinosaurios", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(null, envolver(mensaje), "AppGDI Dinosaurios",
+                    JOptionPane.INFORMATION_MESSAGE);
         }
+    }
+
+    /** Texto de diálogo con saltos de línea automáticos: las rutas largas no ensanchan la ventana. */
+    static JTextArea envolver(String texto) {
+        JTextArea area = new JTextArea(texto);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setEditable(false);
+        area.setOpaque(false);
+        area.setBorder(null);
+        area.setFont(UIManager.getFont("Label.font"));
+        area.setSize(new java.awt.Dimension(480, Short.MAX_VALUE));
+        area.setSize(area.getPreferredSize());
+        return area;
     }
 
     /** Escribe en un .zip el clúster detenido y config.ini. */

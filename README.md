@@ -45,6 +45,8 @@ espacio, AppGDI lo indica con un mensaje antes de crear la base.
 - Windows: ejecute el `.exe`. Se instala en `%LOCALAPPDATA%\Programs` y crea en el
   menú Inicio los accesos para abrir AppGDI, detener su servidor, respaldar y
   restaurar la base, y desinstalar.
+- Windows, sin instalar: descomprima `AppGDI-Dinosaurios-Embebido-Windows-x64-portable.zip`
+  y abra `Abrir AppGDI.cmd`. Funciona desde cualquier carpeta o memoria USB.
 - Linux: `bash AppGDI-Dinosaurios-Embebido-Linux-x64.run`. El mismo archivo vuelve a
   abrir la aplicación y acepta `--detener`, `--respaldar <archivo.zip>` y
   `--restaurar <archivo.zip>`.
